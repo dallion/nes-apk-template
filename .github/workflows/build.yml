@@ -74,7 +74,9 @@ jobs:
             & $pwsh -NoProfile -File tests/build-checks.ps1 2>&1 | Tee-Object -FilePath $log
             if ($LASTEXITCODE -eq 0) { break }
             $output = Get-Content -LiteralPath $log -Raw
-            if ($attempt -eq 3 -or $output -notmatch '(?i)(HTTP (response code: |error )?(429|500|502|503|504)|status code:? (429|500|502|503|504)|Connection (timed out|reset)|Read timed out)') {
+            $failures = [regex]::Matches($output, '(?s)\* What went wrong:(.*?)(?=\* Try:|\z)')
+            $reason = if ($failures.Count) { $failures[$failures.Count - 1].Groups[1].Value } else { '' }
+            if ($attempt -eq 3 -or $reason -notmatch '(?i)(HTTP (response code: |error )?(429|500|502|503|504)|status code:? (429|500|502|503|504)|Connection (timed out|reset)|Read timed out)') {
               throw 'Build checks failed.'
             }
             Start-Sleep -Seconds 5
