@@ -9,6 +9,7 @@ pack="$project_root/pack.sh"
 resolver="$project_root/tools/resolve-game.sh"
 passed=0
 
+jq -c '.[]' "$project_root/tests/packaging-cases.json" > "$scratch/cases.jsonl"
 while IFS= read -r fixture; do
   name="$(jq -r '.name' <<< "$fixture")"
   game="$scratch/$name"
@@ -60,7 +61,7 @@ while IFS= read -r fixture; do
   fi
   passed=$((passed + 1))
   printf 'PASS %s\n' "$name"
-done < <(jq -c '.[]' "$project_root/tests/packaging-cases.json")
+done < "$scratch/cases.jsonl"
 ((passed > 0)) || fail 'No packaging fixtures ran.'
 
 # Exercise path handling, symlink rejection and existing output protection through pack.sh.

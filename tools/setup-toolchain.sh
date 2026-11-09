@@ -153,8 +153,8 @@ for index in "${!components[@]}"; do
 done
 if [[ -n "${missing[0]:-}" ]]; then
   if "$accept_licenses"; then
-    # Feed a finite set of answers so early sdkmanager exit cannot fail the pipeline via SIGPIPE.
-    with_project_toolchain "$manager" "--sdk_root=$project_sdk" --licenses < <(printf 'y\n%.0s' {1..100})
+    # sdkmanager may finish before consuming all answers. Check its exit status.
+    (set +o pipefail; printf 'y\n%.0s' {1..100} | with_project_toolchain "$manager" "--sdk_root=$project_sdk" --licenses)
   fi
   with_project_toolchain "$manager" "--sdk_root=$project_sdk" "${missing[@]}"
 fi
