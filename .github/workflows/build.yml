@@ -32,7 +32,13 @@ jobs:
           $sdkSource = $env:ANDROID_HOME
           & powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-toolchain.ps1 -SdkSource $sdkSource
           if ($LASTEXITCODE -ne 0) { throw 'Tool preparation failed.' }
+      - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          # Matches the fixed LibretroDroid and Oboe upstream commits in DEPENDENCIES.md.
+          allow-checksums: e2b82129ab64751fd40437007bd2f7f2afb3c6e41a9198e628650b22d5824a14
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
+        with:
+          validate-wrappers: false # Validated above, including the pinned upstream wrappers.
       - name: Test, package and lint
         shell: pwsh
         run: |
