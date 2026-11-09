@@ -26,7 +26,16 @@ function Install-Archive($name, $spec, $destination, $innerDirectory) {
         else {
             $partial = $archive + '.partial'
             [Net.ServicePointManager]::SecurityProtocol = [Net.SecurityProtocolType]::Tls12
-            Invoke-WebRequest -Uri $spec.url -OutFile $partial -UseBasicParsing
+            for ($attempt = 1; $attempt -le 3; $attempt++) {
+                try {
+                    Invoke-WebRequest -Uri $spec.url -OutFile $partial -UseBasicParsing
+                    break
+                } catch {
+                    if ($attempt -eq 3) { throw }
+                    Write-Warning "Download failed for $name; retrying ($attempt/3)."
+                    Start-Sleep -Seconds 2
+                }
+            }
             if ((Get-FileHash -LiteralPath $partial -Algorithm SHA256).Hash -ne $spec.sha256) { throw "Archive checksum mismatch: $partial" }
             Move-Item -LiteralPath $partial -Destination $archive
         }
