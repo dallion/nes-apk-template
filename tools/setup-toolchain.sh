@@ -12,6 +12,12 @@ for command in curl tar jq; do
 done
 pwsh="$root/.toolchains/pwsh/pwsh"
 if [[ ! -x "$pwsh" ]]; then
+  for argument in "$@"; do
+    if [[ "$(printf '%s' "$argument" | tr '[:upper:]' '[:lower:]')" == '-checkonly' ]]; then
+      echo 'Missing project PowerShell. Run tools/setup-toolchain.sh.' >&2
+      exit 1
+    fi
+  done
   if [[ -e "$root/.toolchains/pwsh" ]]; then
     echo 'Incomplete project PowerShell installation; inspect .toolchains/pwsh before retrying.' >&2
     exit 1
@@ -25,7 +31,10 @@ if [[ ! -x "$pwsh" ]]; then
   mkdir -p "$cache" "$root/.toolchains/staging"
   archive="$cache/pwsh-$version.tar.gz"
   if [[ ! -f "$archive" ]]; then
-    curl --fail --location --retry 3 --output "$archive.partial" "$url"
+    if ! curl --fail --location --retry 3 --output "$archive.partial" "$url"; then
+      api_url="$(jq -er '.apiUrl' <<< "$spec")"
+      curl --fail --location --retry 3 -H 'Accept: application/octet-stream' --output "$archive.partial" "$api_url"
+    fi
     if [[ "$platform" == linux-* ]]; then
       actual="$(sha256sum "$archive.partial" | cut -d ' ' -f 1)"
     else

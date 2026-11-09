@@ -30,6 +30,11 @@ $result=$process.StandardError.ReadToEnd()+$process.StandardOutput.ReadToEnd()
 $process.WaitForExit()
 if ($process.ExitCode -eq 0 -or $result -notmatch 'Missing jdk') { throw 'Missing project JDK must fail without falling back to global Java' }
 if (Test-Path -LiteralPath (Join-Path $fixture '.toolchains')) { throw 'CheckOnly created an installation' }
+if (-not $paths.IsWindows) {
+    Copy-Item -LiteralPath (Join-Path $root 'tools/setup-toolchain.sh') -Destination (Join-Path $fixture 'tools/setup-toolchain.sh')
+    & bash (Join-Path $fixture 'tools/setup-toolchain.sh') -CheckOnly 2>&1 | Out-String | Out-Null
+    if ($LASTEXITCODE -eq 0 -or (Test-Path -LiteralPath (Join-Path $fixture '.toolchains'))) { throw 'Unix CheckOnly must not bootstrap tools.' }
+}
 $lock=Get-Content (Join-Path $fixture 'tools/toolchain.lock.json') -Raw | ConvertFrom-Json
 $lock=$lock.platforms.($paths.Platform)
 foreach ($name in @('jdk','pwsh')) {

@@ -10,6 +10,12 @@ if ($LASTEXITCODE -ne 0) { throw 'Test ROM generation failed.' }
 [IO.File]::WriteAllText((Join-Path $game 'probe.cht'), "[Probe]`non=6800,16`n", [Text.UTF8Encoding]::new($false))
 Push-Location $root
 try {
+    for ($attempt = 1; $attempt -le 3; $attempt++) {
+        & $paths.Gradle --version
+        if ($LASTEXITCODE -eq 0) { break }
+        if ($attempt -eq 3) { throw 'Gradle bootstrap failed.' }
+        Start-Sleep -Seconds 2
+    }
     & $paths.PowerShell -NoProfile -File (Join-Path $PSScriptRoot 'toolchain-checks.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Toolchain checks failed.' }
     & $paths.PowerShell -NoProfile -File (Join-Path $PSScriptRoot 'pack-checks.ps1')

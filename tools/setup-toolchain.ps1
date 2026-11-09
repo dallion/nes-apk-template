@@ -32,7 +32,12 @@ function Install-Archive($name, $spec, $destination, $innerDirectory) {
                     Invoke-WebRequest -Uri $spec.url -OutFile $partial -UseBasicParsing
                     break
                 } catch {
-                    if ($attempt -eq 3) { throw }
+                    if ($attempt -eq 3) {
+                        if (-not $spec.apiUrl) { throw }
+                        Write-Output "Retrying $name through the official asset API."
+                        Invoke-WebRequest -Uri $spec.apiUrl -Headers @{Accept='application/octet-stream'} -OutFile $partial -UseBasicParsing
+                        break
+                    }
                     Write-Warning "Download failed for $name; retrying ($attempt/3)."
                     Start-Sleep -Seconds 2
                 }
