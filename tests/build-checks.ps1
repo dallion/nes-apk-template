@@ -14,6 +14,7 @@ try {
         & $paths.Gradle --version
         if ($LASTEXITCODE -eq 0) { break }
         if ($attempt -eq 3) { throw 'Gradle bootstrap failed.' }
+        if ($attempt -eq 1) { & (Join-Path $root 'tools/prepare-gradle-cache.ps1') }
         Start-Sleep -Seconds 2
     }
     & $paths.PowerShell -NoProfile -File (Join-Path $PSScriptRoot 'toolchain-checks.ps1')

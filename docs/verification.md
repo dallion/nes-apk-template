@@ -18,6 +18,8 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-toolchain.ps1 -C
 
 安装 Node.js 后，可运行 `./tests/build-checks.ps1` 生成自编测试 ROM 和独立配置，依次执行工具链检查、打包输入检查、单元测试、APK 打包和 lint。GitHub Actions 使用同一入口。
 
+Gradle 发行包下载失败时，构建检查从同一官方发布资产预取文件，按 Wrapper 配置中的 SHA-256 核验后放入标准缓存，再由原 Wrapper 继续启动。
+
 ```powershell
 ./tests/pack-checks.ps1
 ./pack.ps1 -Game <game-directory> -CheckOnly

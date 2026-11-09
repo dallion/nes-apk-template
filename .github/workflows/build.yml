@@ -41,6 +41,8 @@ jobs:
           key: tools-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('tools/toolchain.lock.json', 'gradle.properties') }}
       - name: Prepare project tools
         if: runner.os == 'Windows'
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: powershell
         run: |
           $sdkSource = $env:ANDROID_HOME
@@ -48,6 +50,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { throw 'Tool preparation failed.' }
       - name: Prepare project tools (Unix)
         if: runner.os != 'Windows'
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: bash
         run: ./tools/setup-toolchain.sh -SdkSource "${ANDROID_HOME:-}" -AcceptAndroidLicenses
       - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
@@ -58,6 +62,8 @@ jobs:
         with:
           validate-wrappers: false # Validated above, including the pinned upstream wrappers.
       - name: Test, package and lint
+        env:
+          GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
           $pwsh = if ($IsWindows) { './.toolchains/pwsh/pwsh.exe' } else { './.toolchains/pwsh/pwsh' }

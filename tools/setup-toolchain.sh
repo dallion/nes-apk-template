@@ -33,7 +33,19 @@ if [[ ! -x "$pwsh" ]]; then
   if [[ ! -f "$archive" ]]; then
     if ! curl --fail --location --retry 3 --output "$archive.partial" "$url"; then
       api_url="$(jq -er '.apiUrl' <<< "$spec")"
-      curl --fail --location --retry 3 -H 'Accept: application/octet-stream' --output "$archive.partial" "$api_url"
+      [[ "$api_url" == https://api.github.com/* ]] || { echo 'Unexpected asset API host' >&2; exit 1; }
+      headers=(-H 'Accept: application/octet-stream')
+      if [[ -n "${GH_TOKEN:-}" ]]; then
+        headers+=(-H "Authorization: Bearer $GH_TOKEN")
+      fi
+      status="$(curl --location --retry 3 --silent --show-error "${headers[@]}" --output "$archive.partial" --write-out '%{http_code}' "$api_url")"
+      if [[ "$status" != 200 ]]; then
+        echo "Asset API download failed: HTTP $status" >&2
+        if jq -e . "$archive.partial" >/dev/null 2>&1; then
+          jq -r '.message // empty' "$archive.partial" >&2
+        fi
+        exit 1
+      fi
     fi
     if [[ "$platform" == linux-* ]]; then
       actual="$(sha256sum "$archive.partial" | cut -d ' ' -f 1)"

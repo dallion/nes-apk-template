@@ -35,7 +35,10 @@ function Install-Archive($name, $spec, $destination, $innerDirectory) {
                     if ($attempt -eq 3) {
                         if (-not $spec.apiUrl) { throw }
                         Write-Output "Retrying $name through the official asset API."
-                        Invoke-WebRequest -Uri $spec.apiUrl -Headers @{Accept='application/octet-stream'} -OutFile $partial -UseBasicParsing
+                        if (([uri]$spec.apiUrl).Host -ne 'api.github.com') { throw 'Unexpected asset API host.' }
+                        $headers = @{Accept='application/octet-stream'}
+                        if ($env:GH_TOKEN) { $headers.Authorization = 'Bearer ' + $env:GH_TOKEN }
+                        Invoke-WebRequest -Uri $spec.apiUrl -Headers $headers -OutFile $partial -UseBasicParsing
                         break
                     }
                     Write-Warning "Download failed for $name; retrying ($attempt/3)."
