@@ -105,7 +105,7 @@ jobs:
               test ! -e .toolchains/pwsh
               break
             fi
-            if [[ "$attempt" == 3 ]] || ! awk '
+            if [[ "$attempt" == 3 ]] || ! LC_ALL=C awk '
               /\* What went wrong:/ { reason = ""; active = 1; next }
               /\* Try:/ { active = 0 }
               active { reason = reason " " tolower($0) }

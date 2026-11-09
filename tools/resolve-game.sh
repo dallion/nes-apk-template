@@ -90,7 +90,7 @@ else
   if [[ -z "$binding" ]]; then
     warnings+=('金手指未绑定经过验证的 ROM 摘要，打包仅检查代码语法。')
   else
-    [[ "$binding" == "$rom_hash" ]] || fail "金手指绑定的 ROM 摘要不匹配。实际：$rom_hash；需要重新验证，程序不会自动修改配置。"
+    [[ "$binding" == "$rom_hash" ]] || fail "金手指绑定的 ROM 摘要不匹配。实际：${rom_hash}；需要重新验证，程序不会自动修改配置。"
   fi
   encoding=UTF-8
   if ! iconv -f UTF-8 -t UTF-8 < "$cheat_file" >/dev/null 2>&1; then encoding=GB18030; fi

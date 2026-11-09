@@ -80,7 +80,7 @@ verify_asset() {
     return
   fi
   actual="$(unzip -p "$temporary" "$entry" | sha256)" || fail "构建缺少或无法读取资源：$entry"
-  [[ "$actual" == "$expected" ]] || fail "构建过程中输入变化：$entry，未输出 APK，请重新打包。"
+  [[ "$actual" == "$expected" ]] || fail "构建过程中输入变化：${entry}，未输出 APK，请重新打包。"
 }
 verify_asset assets/game.nes "$(jq -r '.romSha256' <<< "$selected")"
 verify_asset assets/game.cht "$(jq -r '.cheatSha256' <<< "$selected")"
