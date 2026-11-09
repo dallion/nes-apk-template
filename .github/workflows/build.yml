@@ -67,8 +67,18 @@ jobs:
         shell: pwsh
         run: |
           $pwsh = if ($IsWindows) { './.toolchains/pwsh/pwsh.exe' } else { './.toolchains/pwsh/pwsh' }
-          & $pwsh -NoProfile -File tests/build-checks.ps1
-          if ($LASTEXITCODE -ne 0) { throw 'Build checks failed.' }
+          $logs = 'tmp/' + (Get-Date -Format 'yyyy-MM-dd') + '-ci-checks'
+          New-Item -ItemType Directory -Force -Path $logs | Out-Null
+          for ($attempt = 1; $attempt -le 3; $attempt++) {
+            $log = Join-Path $logs "attempt-$attempt.log"
+            & $pwsh -NoProfile -File tests/build-checks.ps1 2>&1 | Tee-Object -FilePath $log
+            if ($LASTEXITCODE -eq 0) { break }
+            $output = Get-Content -LiteralPath $log -Raw
+            if ($attempt -eq 3 -or $output -notmatch '(?i)(HTTP (response code: |error )?(429|500|502|503|504)|status code:? (429|500|502|503|504)|Connection (timed out|reset)|Read timed out)') {
+              throw 'Build checks failed.'
+            }
+            Start-Sleep -Seconds 5
+          }
       - name: Upload reports and test APK
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -79,5 +89,6 @@ jobs:
             app/build/test-results/
             app/build/intermediates/cxx/**/logs/
             tmp/**/*pack-checks*/
+            tmp/**/*ci-checks*/
             outputs/ci_probe/
           retention-days: 7
