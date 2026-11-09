@@ -11,7 +11,7 @@ if (localPropertiesFile.isFile()) {
 def gameDir = providers.gradleProperty('gameDir').getOrElse(localProperties.getProperty('gameDir', ''))
 if (!gameDir.trim()) throw new GradleException('Specify -PgameDir=<game directory> or set gameDir in local.properties; no default game is selected.')
 def gameDirectory = rootProject.file(gameDir)
-def projectPowerShell = rootProject.file('.toolchains/pwsh/pwsh.exe')
+def projectPowerShell = rootProject.file(System.getProperty('os.name').toLowerCase().startsWith('windows') ? '.toolchains/pwsh/pwsh.exe' : '.toolchains/pwsh/pwsh')
 if (!projectPowerShell.isFile()) throw new GradleException('Project PowerShell is missing. Run tools/setup-toolchain.ps1.')
 def resolved = providers.exec {
     commandLine projectPowerShell.absolutePath, '-NoProfile', '-File', rootProject.file('tools/resolve-game.ps1').absolutePath,

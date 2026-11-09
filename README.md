@@ -16,17 +16,25 @@
 
 ## 快速开始
 
-构建环境为 Windows x64，ROM 由使用者自行准备。
+构建环境支持 Windows x64、Linux x64，以及 Intel / Apple Silicon Mac。ROM 由使用者自行准备。
 
 ### 1. 准备环境
 
-在仓库根目录运行：
+Windows 在仓库根目录运行：
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-toolchain.ps1
 ```
 
+macOS / Linux 需要 `curl`、`tar` 和 `jq`，在仓库根目录运行：
+
+```bash
+./tools/setup-toolchain.sh
+```
+
 首次运行会下载工具并安装到 `.toolchains/`，SDK 安装时按提示确认许可证。后续运行复用已有工具；添加 `-CheckOnly` 可检查环境。
+
+后续命令在项目 PowerShell 中执行：Windows 启动 `./.toolchains/pwsh/pwsh.exe`，macOS / Linux 启动 `./.toolchains/pwsh/pwsh`。
 
 ### 2. 添加游戏
 
@@ -129,6 +137,8 @@ versionName=1.0
 ```powershell
 ./gradlew.bat -PgameDir=work/my-game :app:assembleDebug
 ```
+
+macOS / Linux 使用 `./gradlew`。两个入口均选择项目内 JDK 和 Android SDK。
 
 `-PgameDir` 优先于 `local.properties` 中的选择。Gradle 输出位于 `app/build/outputs/apk/debug/`；按游戏配置命名和交付 APK 使用 `pack.ps1`。
 

@@ -26,7 +26,8 @@
 
 ## Entry Points and Outputs
 
-- Prepare Windows x64 tools with `powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-toolchain.ps1`. Keep JDK, PowerShell and Android SDK under the project's ignored `.toolchains/`; use `-CheckOnly` to check installed tools. Archive versions and checksums belong to `tools/toolchain.lock.json`; Android build component versions belong to root `gradle.properties`.
+- Prepare Windows x64 tools with `powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-toolchain.ps1`; Linux x64 and Intel / Apple Silicon macOS use `./tools/setup-toolchain.sh` with `curl`, `tar` and `jq` available. Keep JDK, PowerShell and Android SDK under the project's ignored `.toolchains/`; use `-CheckOnly` to check installed tools. Archive versions and checksums are selected by host platform in `tools/toolchain.lock.json`; Android build component versions belong to root `gradle.properties`.
+- SDK setup prompts for licenses by default. `-SdkSource` reuses installed components and merges that SDK's accepted license records; unattended setup may explicitly pass `-AcceptAndroidLicenses`.
 - Use the project JDK and SDK for command-line and IDE builds. Setup writes `local.properties` and `.gradle/config.properties`, preserving the explicit game selection; IDE Gradle JDK uses `GRADLE_LOCAL_JAVA_HOME`. Packaging restores the caller's process environment after execution.
 - Specify game inputs through a game directory: use `pack.ps1 -Game <directory>`; direct Gradle builds use `-PgameDir=<directory>`. Both share input selection and validation through `tools/resolve-game.ps1`.
 - Require an explicit game directory for both entry points. Gradle also accepts `gameDir` in the ignored project `local.properties` for IDE sync and builds; `-PgameDir` takes precedence. Shared build and test scripts must not default to a personal game directory, app identity, or device identifier.

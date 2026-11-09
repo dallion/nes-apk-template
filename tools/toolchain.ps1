@@ -23,13 +23,25 @@ function Install-ProjectSdkCopy {
 function Get-ProjectToolchain {
     $projectRoot = Split-Path $PSScriptRoot -Parent
     $directory = Join-Path $projectRoot '.toolchains'
+    $onWindows = $env:OS -eq 'Windows_NT'
+    $system = if ($onWindows) { 'windows' } elseif ($IsMacOS) { 'macos' } elseif ($IsLinux) { 'linux' } else { throw 'Unsupported host OS.' }
+    $architecture = if ($onWindows) { $env:PROCESSOR_ARCHITECTURE } else { [Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString() }
+    $architecture = if ($architecture -in @('AMD64','X64')) { 'x64' } elseif ($architecture -eq 'ARM64') { 'arm64' } else { throw "Unsupported host architecture: $architecture" }
+    $platform = "$system-$architecture"
+    if ($platform -notin @('windows-x64','linux-x64','macos-x64','macos-arm64')) { throw "Unsupported host platform: $platform" }
+    $executable = if ($onWindows) { '.exe' } else { '' }
     [pscustomobject]@{
         Root = $projectRoot
         Directory = $directory
+        Platform = $platform
+        IsWindows = $onWindows
         Jdk = Join-Path $directory 'jdk'
         Sdk = Join-Path $directory 'android-sdk'
-        PowerShell = Join-Path $directory 'pwsh/pwsh.exe'
-        Adb = Join-Path $directory 'android-sdk/platform-tools/adb.exe'
+        PowerShell = Join-Path $directory "pwsh/pwsh$executable"
+        Java = Join-Path $directory "jdk/bin/java$executable"
+        Adb = Join-Path $directory "android-sdk/platform-tools/adb$executable"
+        Gradle = Join-Path $projectRoot $(if ($onWindows) { 'gradlew.bat' } else { 'gradlew' })
+        NdkHost = if ($onWindows) { 'windows-x86_64' } elseif ($IsMacOS) { 'darwin-x86_64' } else { 'linux-x86_64' }
     }
 }
 

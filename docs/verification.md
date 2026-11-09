@@ -2,6 +2,8 @@
 
 环境准备见 [使用说明](../README.md)，输入和交付约束见 [打包规则](packaging.md)。命令从仓库根目录、项目内 PowerShell 中执行；设备标识和待测游戏目录由执行者提供。
 
+以下环境检查命令使用 Windows 入口；macOS / Linux 用 `./tools/setup-toolchain.sh -CheckOnly`、`./.toolchains/pwsh/pwsh` 和 `./gradlew` 替换对应命令。
+
 工具环境检查：
 
 ```powershell

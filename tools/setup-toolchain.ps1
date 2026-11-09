@@ -1,12 +1,12 @@
 [CmdletBinding()]
-param([switch]$CheckOnly, [string]$ArchiveDirectory, [string]$SdkSource)
+param([switch]$CheckOnly, [string]$ArchiveDirectory, [string]$SdkSource, [switch]$AcceptAndroidLicenses)
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot 'toolchain.ps1')
 $paths = Get-ProjectToolchain
 $lock = Get-Content (Join-Path $PSScriptRoot 'toolchain.lock.json') -Raw | ConvertFrom-Json
-if (-not [Environment]::Is64BitOperatingSystem -or $env:OS -ne 'Windows_NT') { throw 'This toolchain supports Windows x64.' }
-if ($env:PROCESSOR_ARCHITECTURE -eq 'ARM64') { throw 'This toolchain supports Windows x64, not ARM64.' }
+$lock = $lock.platforms.($paths.Platform)
+if (-not $lock) { throw "No toolchain lock for $($paths.Platform)." }
 function Install-Archive($name, $spec, $destination, $innerDirectory) {
     $marker = Join-Path $destination '.project-toolchain.json'
     if (Test-Path -LiteralPath $marker) {
@@ -19,7 +19,8 @@ function Install-Archive($name, $spec, $destination, $innerDirectory) {
     if (Test-Path -LiteralPath $destination) { throw "Unmanaged installation: $destination" }
     $cache = Join-Path $paths.Directory 'downloads'
     New-Item -ItemType Directory -Force -Path $cache | Out-Null
-    $archive = Join-Path $cache "$name-$($spec.version).zip"
+    $extension = if ($spec.url.EndsWith('.tar.gz')) { 'tar.gz' } else { 'zip' }
+    $archive = Join-Path $cache "$name-$($spec.version).$extension"
     if (-not (Test-Path -LiteralPath $archive)) {
         $supplied = if ($ArchiveDirectory) { Join-Path $ArchiveDirectory ([IO.Path]::GetFileName(([uri]$spec.url).AbsolutePath)) } else { $null }
         if ($supplied -and (Test-Path -LiteralPath $supplied)) { Copy-Item -LiteralPath $supplied -Destination $archive }
@@ -42,15 +43,22 @@ function Install-Archive($name, $spec, $destination, $innerDirectory) {
     }
     if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $spec.sha256) { throw "Archive checksum mismatch: $archive" }
     $stage = Join-Path $paths.Directory ('staging/' + [guid]::NewGuid().ToString('N'))
-    Add-Type -AssemblyName System.IO.Compression.FileSystem
-    [IO.Compression.ZipFile]::ExtractToDirectory($archive, $stage)
+    if ($extension -eq 'tar.gz') {
+        New-Item -ItemType Directory -Force -Path $stage | Out-Null
+        & tar -xzf $archive -C $stage
+        if ($LASTEXITCODE -ne 0) { throw "Archive extraction failed: $archive" }
+    } else {
+        Add-Type -AssemblyName System.IO.Compression.FileSystem
+        [IO.Compression.ZipFile]::ExtractToDirectory($archive, $stage)
+    }
     $source = if ($innerDirectory) { Join-Path $stage $innerDirectory } else { $stage }
     if (-not (Test-Path -LiteralPath $source)) { throw "Unexpected archive layout: $archive" }
     New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent) | Out-Null
     $spec | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $source '.project-toolchain.json') -Encoding UTF8
     Move-Item -LiteralPath $source -Destination $destination
 }
-Install-Archive 'jdk' $lock.jdk $paths.Jdk "jdk-$($lock.jdk.version)"
+$jdkInner = "jdk-$($lock.jdk.version)" + $(if ($paths.Platform.StartsWith('macos-')) { '/Contents/Home' } else { '' })
+Install-Archive 'jdk' $lock.jdk $paths.Jdk $jdkInner
 Install-Archive 'pwsh' $lock.pwsh (Split-Path $paths.PowerShell -Parent) ''
 if ($PSVersionTable.PSVersion.Major -lt 7) {
     # Android archives contain paths beyond Windows PowerShell/.NET Framework's path limit.
@@ -58,15 +66,24 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
     if ($CheckOnly) { $arguments += '-CheckOnly' }
     if ($ArchiveDirectory) { $arguments += @('-ArchiveDirectory', $ArchiveDirectory) }
     if ($SdkSource) { $arguments += @('-SdkSource', $SdkSource) }
+    if ($AcceptAndroidLicenses) { $arguments += '-AcceptAndroidLicenses' }
     & $paths.PowerShell @arguments
     if ($LASTEXITCODE -ne 0) { throw 'Project toolchain preparation failed.' }
     return
 }
 Install-Archive 'android-command-line-tools' $lock.androidCommandLineTools (Join-Path $paths.Sdk "cmdline-tools/$($lock.androidCommandLineTools.version)") 'cmdline-tools'
+if (-not $paths.IsWindows -and -not $CheckOnly) {
+    & chmod +x $paths.PowerShell
+    if ($LASTEXITCODE -ne 0) { throw 'Cannot make project PowerShell executable.' }
+    Get-ChildItem (Join-Path $paths.Sdk "cmdline-tools/$($lock.androidCommandLineTools.version)/bin") -File | ForEach-Object {
+        & chmod +x $_.FullName
+        if ($LASTEXITCODE -ne 0) { throw 'Cannot make SDK command executable.' }
+    }
+}
 $jdkRelease = Get-Content -LiteralPath (Join-Path $paths.Jdk 'release') -Raw
 if ($jdkRelease -notmatch ('(?m)^JAVA_RUNTIME_VERSION="' + [regex]::Escape($lock.jdk.version) + '-LTS"')) { throw 'Project JDK version does not match the lock file.' }
 Invoke-ProjectToolchain {
-    & (Join-Path $paths.Jdk 'bin/java.exe') -version
+    & $paths.Java -version
     if ($LASTEXITCODE -ne 0) { throw 'Project Java cannot start.' }
     $version = & $paths.PowerShell -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
     if ($LASTEXITCODE -ne 0) { throw 'Project PowerShell cannot start.' }
@@ -75,12 +92,14 @@ Invoke-ProjectToolchain {
 }
 
 $properties = Get-Content (Join-Path $paths.Root 'gradle.properties') -Raw | ConvertFrom-StringData
+$exe = if ($paths.IsWindows) { '.exe' } else { '' }
+$script = if ($paths.IsWindows) { '.cmd' } else { '' }
 $components = @(
     @{Package="platforms;android-$($properties.androidCompileSdk)";Directory="platforms/android-$($properties.androidCompileSdk)";Required='android.jar'},
-    @{Package="build-tools;$($properties.androidBuildToolsVersion)";Directory="build-tools/$($properties.androidBuildToolsVersion)";Required='aapt2.exe'},
-    @{Package="ndk;$($properties.androidNdkVersion)";Directory="ndk/$($properties.androidNdkVersion)";Required='ndk-build.cmd'},
-    @{Package="cmake;$($properties.androidCmakeVersion)";Directory="cmake/$($properties.androidCmakeVersion)";Required='bin/cmake.exe'},
-    @{Package='platform-tools';Directory='platform-tools';Required='adb.exe'}
+    @{Package="build-tools;$($properties.androidBuildToolsVersion)";Directory="build-tools/$($properties.androidBuildToolsVersion)";Required="aapt2$exe"},
+    @{Package="ndk;$($properties.androidNdkVersion)";Directory="ndk/$($properties.androidNdkVersion)";Required="ndk-build$script"},
+    @{Package="cmake;$($properties.androidCmakeVersion)";Directory="cmake/$($properties.androidCmakeVersion)";Required="bin/cmake$exe"},
+    @{Package='platform-tools';Directory='platform-tools';Required="adb$exe"}
 )
 $missing = @()
 if ($SdkSource -and -not $CheckOnly) {
@@ -118,7 +137,12 @@ foreach ($component in $components) {
 }
 if ($missing.Count) {
     Invoke-ProjectToolchain {
-        $manager = Join-Path $paths.Sdk "cmdline-tools/$($lock.androidCommandLineTools.version)/bin/sdkmanager.bat"
+        $managerName = if ($paths.IsWindows) { 'sdkmanager.bat' } else { 'sdkmanager' }
+        $manager = Join-Path $paths.Sdk "cmdline-tools/$($lock.androidCommandLineTools.version)/bin/$managerName"
+        if ($AcceptAndroidLicenses) {
+            1..100 | ForEach-Object { 'y' } | & $manager "--sdk_root=$($paths.Sdk)" --licenses
+            if ($LASTEXITCODE -ne 0) { throw 'SDK license acceptance failed.' }
+        }
         & $manager "--sdk_root=$($paths.Sdk)" @missing
         if ($LASTEXITCODE -ne 0) { throw 'SDK installation failed. Review SDK license prompts and retry setup.' }
     }
@@ -130,7 +154,7 @@ foreach ($component in $components) {
     if ($component.Package -match '^(ndk|cmake|build-tools);(.+)$' -and $installed.'Pkg.Revision' -ne $Matches[2]) { throw "SDK component version mismatch: $($component.Package)" }
     if ($component.Package -like 'platforms;*' -and $installed.'AndroidVersion.ApiLevel' -ne $properties.androidCompileSdk) { throw 'SDK platform API mismatch.' }
 }
-foreach ($relative in @('platform-tools/adb.exe',"platforms/android-$($properties.androidCompileSdk)/android.jar","build-tools/$($properties.androidBuildToolsVersion)/aapt2.exe","ndk/$($properties.androidNdkVersion)/ndk-build.cmd","cmake/$($properties.androidCmakeVersion)/bin/cmake.exe")) {
+foreach ($relative in @("platform-tools/adb$exe","platforms/android-$($properties.androidCompileSdk)/android.jar","build-tools/$($properties.androidBuildToolsVersion)/aapt2$exe","ndk/$($properties.androidNdkVersion)/ndk-build$script","cmake/$($properties.androidCmakeVersion)/bin/cmake$exe")) {
     if (-not (Test-Path -LiteralPath (Join-Path $paths.Sdk $relative))) { throw "SDK installation is incomplete: $relative" }
 }
 if (-not $CheckOnly) {

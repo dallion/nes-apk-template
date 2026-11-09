@@ -27,7 +27,7 @@ Write-Output "APK：$($selected.output)"
 foreach($warning in $selected.warnings){Write-Warning $warning}
 if((Test-Path -LiteralPath $selected.output) -and -not $Overwrite){throw '输出 APK 已存在。请递增版本号，或明确传入 -Overwrite 替换。'}
 if($CheckOnly){return}
-if(-not (Test-Path -LiteralPath (Join-Path $env:JAVA_HOME 'bin/java.exe'))){throw 'Project JDK is missing. Run tools/setup-toolchain.ps1.'}
+if(-not (Test-Path -LiteralPath (Get-ProjectToolchain).Java)){throw 'Project JDK is missing. Run tools/setup-toolchain.ps1.'}
 $tasks=@(':app:assembleDebug')
 if($Test -or $selected.cheatFile){$tasks=@(':app:testDebugUnitTest',':app:assembleDebug')}
 $snapshotDirectory=Join-Path $PSScriptRoot 'build/package-inputs'
@@ -36,7 +36,7 @@ $snapshot=Join-Path $snapshotDirectory ([guid]::NewGuid().ToString('N')+'.json')
 [IO.File]::WriteAllText($snapshot,($selected | ConvertTo-Json -Depth 5),[Text.UTF8Encoding]::new($false))
 Push-Location $PSScriptRoot
 try {
-    & (Join-Path $PSScriptRoot 'gradlew.bat') @tasks "-PgameDir=$($selected.directory)" "-PgameInputsSnapshot=$snapshot" --console=plain
+    & (Get-ProjectToolchain).Gradle @tasks "-PgameDir=$($selected.directory)" "-PgameInputsSnapshot=$snapshot" --console=plain
     if($LASTEXITCODE -ne 0){throw "构建失败，退出码 $LASTEXITCODE，未更新交付 APK。"}
     $metadata=Get-Content -LiteralPath (Join-Path $PSScriptRoot 'app/build/outputs/apk/debug/output-metadata.json') -Raw | ConvertFrom-Json
     if($metadata.applicationId -cne $selected.applicationId -or @($metadata.elements).Count -ne 1 -or

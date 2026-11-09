@@ -5,7 +5,8 @@ param(
 $ErrorActionPreference='Stop'
 $root=Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 . (Join-Path $root 'tools/toolchain.ps1')
-$SdkPath=(Get-ProjectToolchain).Sdk
+$paths=Get-ProjectToolchain
+$SdkPath=$paths.Sdk
 $buildProperties=Get-Content -LiteralPath (Join-Path $root 'gradle.properties') -Raw | ConvertFrom-StringData
 $ndkVersion=$buildProperties.androidNdkVersion
 $apiLevel=$buildProperties.androidMinSdk
@@ -14,14 +15,15 @@ $pattern='[\\/]local[\\/]' + [regex]::Escape($Abi) + '[\\/]libretro\.so$'
 $core=Get-ChildItem (Join-Path $root 'app/build/intermediates/cxx/Debug') -Recurse -Filter libretro.so |
     Where-Object FullName -Match $pattern | Sort-Object LastWriteTime -Descending | Select-Object -First 1
 if(-not $core){throw "请先构建 $Abi 内核"}
-$work=Join-Path $root 'work'
+$work=Join-Path $root ('tmp/' + (Get-Date -Format 'yyyy-MM-dd') + '-native-cheats/' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $work | Out-Null
 $triple=if($Abi -eq 'arm64-v8a'){'aarch64'}else{'x86_64'}
-$compiler=Join-Path $SdkPath "ndk/$ndkVersion/toolchains/llvm/prebuilt/windows-x86_64/bin/$triple-linux-android$apiLevel-clang.cmd"
+$suffix=if($paths.IsWindows){'.cmd'}else{''}
+$compiler=Join-Path $SdkPath "ndk/$ndkVersion/toolchains/llvm/prebuilt/$($paths.NdkHost)/bin/$triple-linux-android$apiLevel-clang$suffix"
 $binary=Join-Path $work "cheat-probe-$Abi"
 & $compiler (Join-Path $PSScriptRoot 'cheat-probe.c') -I (Join-Path $root 'native/fceumm/src/drivers/libretro/libretro-common/include') -ldl -o $binary
 if($LASTEXITCODE -ne 0){throw '探针编译失败'}
-$adb=Join-Path $SdkPath 'platform-tools/adb.exe'
+$adb=$paths.Adb
 function Invoke-Adb([string[]]$Arguments) {
     & $adb -s $Device @Arguments
     if($LASTEXITCODE -ne 0){throw "ADB 失败：$Arguments"}

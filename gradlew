@@ -27,6 +27,11 @@ cd "$SAVED" >/dev/null
 APP_NAME="Gradle"
 APP_BASE_NAME=`basename "$0"`
 
+JAVA_HOME="$APP_HOME/.toolchains/jdk"
+ANDROID_HOME="$APP_HOME/.toolchains/android-sdk"
+ANDROID_SDK_ROOT="$ANDROID_HOME"
+export JAVA_HOME ANDROID_HOME ANDROID_SDK_ROOT
+
 # Add default JVM options here. You can also use JAVA_OPTS and GRADLE_OPTS to pass JVM options to this script.
 DEFAULT_JVM_OPTS=""
 
