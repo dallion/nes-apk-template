@@ -1,0 +1,41 @@
+# Packaging Rules
+
+## Game Directory
+
+- Keep personal game collections under `work/<game-directory>/`, excluded from Git. Retain game-specific backups and evidence in an `archive/` subdirectory; use `tmp/` for disposable test inputs and execution output.
+- One directory is one packaging unit. Read direct files only; do not search subdirectories or reference external game files.
+- Require exactly one `.nes` and `game.properties`; allow at most one `.cht`. Match extensions case-insensitively and ignore other files.
+- Preserve filenames. Recommend matching NES/CHT basenames; warn on a mismatch and pair by directory.
+- Missing CHT is allowed with a notice. Empty or comment-only CHT is allowed with a notice; invalid codes block APK delivery.
+- Package assets internally as `game.nes` and optional `game.cht`. Never retain assets from a previous game.
+
+## Configuration and Identity
+
+- Use UTF-8 `key=value`, without escapes or continuation lines. Reject duplicate and unknown keys.
+- Allow only `id`, `appName`, `applicationId`, `versionCode`, `versionName`, and `cheatsRomSha256`.
+- Require `id`, `versionCode`, and `versionName`. IDs match `[a-z][a-z0-9_]{0,49}` and exclude Windows reserved device names; version codes are positive integers and version names are nonempty.
+- Default `appName` to the ROM basename and `applicationId` to `com.nes.game.<id>`. An explicit package name preserves an existing app identity.
+- Keep ID, package name, and signing key stable for APK updates; increment `versionCode`. Coexisting games or variants use separate directories, distinct IDs, and distinct package names.
+- Renaming directories, files, or display names must not change app identity. Never derive identity from ROM hashes.
+
+## Cheats and ROM Binding
+
+- Use the optional `cheatsRomSha256` to record a verified ROM's SHA-256. With CHT present, warn if unbound and reject a mismatched binding.
+- Never automatically create or refresh a verification binding. A matching hash identifies the ROM; it does not prove cheat effects.
+- Validate bundled codes using the application's parser before delivery. New bundled presets default to disabled; preserve local choices under the existing ROM-specific storage rules.
+
+## Entry Points and Outputs
+
+- Prepare Windows x64 tools with `powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-toolchain.ps1`. Keep JDK, PowerShell and Android SDK under the project's ignored `.toolchains/`; use `-CheckOnly` to check installed tools. Archive versions and checksums belong to `tools/toolchain.lock.json`; Android build component versions belong to root `gradle.properties`.
+- Use the project JDK and SDK for command-line and IDE builds. Setup writes `local.properties` and `.gradle/config.properties`, preserving the explicit game selection; IDE Gradle JDK uses `GRADLE_LOCAL_JAVA_HOME`. Packaging restores the caller's process environment after execution.
+- Specify game inputs through a game directory: use `pack.ps1 -Game <directory>`; direct Gradle builds use `-PgameDir=<directory>`. Both share input selection and validation through `tools/resolve-game.ps1`.
+- Require an explicit game directory for both entry points. Gradle also accepts `gameDir` in the ignored project `local.properties` for IDE sync and builds; `-PgameDir` takes precedence. Shared build and test scripts must not default to a personal game directory, app identity, or device identifier.
+- Deliver to `outputs/<id>/<appName>-v<versionName>-c<versionCode>-debug.apk`. Replace Windows-invalid filename characters with `_` and trim trailing spaces and periods; retain the original display name in the app.
+- Reject an existing delivery path unless `-Overwrite` is explicit. Failed packaging must preserve existing outputs and deliver no new APK.
+- Before delivery, verify APK identity, version, and ROM/CHT content against the selected inputs. Print ID, display name, package, version, selected files, ROM hash, notices, and output path.
+
+## Validation
+
+- For packaging changes, run `tests/pack-checks.ps1` and the affected Gradle checks.
+- Cover missing/multiple NES files, multiple/absent CHT files, invalid configuration and codes, hash mismatches, output protection, and switching between games with and without cheats.
+- For identity changes, verify intended coexistence or update behavior and preserve the existing app's data and signature.

@@ -1,0 +1,22 @@
+plugins { id 'com.android.library'; id 'org.jetbrains.kotlin.android' }
+android {
+    namespace = 'com.swordfish.libretrodroid'
+    compileSdk rootProject.ext.androidBuild.compileSdk
+    buildToolsVersion rootProject.ext.androidBuild.buildToolsVersion
+    ndkVersion = rootProject.ext.androidBuild.ndkVersion
+    defaultConfig {
+        minSdk rootProject.ext.androidBuild.minSdk
+        ndk { abiFilters.addAll(rootProject.ext.androidBuild.targetAbis) }
+        externalNativeBuild { cmake { arguments '-DANDROID_STL=c++_static' } }
+    }
+    sourceSets.main {
+        manifest.srcFile '../native/libretrodroid/libretrodroid/src/main/AndroidManifest.xml'
+        java.srcDirs = ['../native/libretrodroid/libretrodroid/src/main/java']
+    }
+    externalNativeBuild { cmake { version = rootProject.ext.androidBuild.cmakeVersion; path '../native/libretrodroid/libretrodroid/src/main/cpp/CMakeLists.txt' } }
+    compileOptions { sourceCompatibility rootProject.ext.androidBuild.javaVersion; targetCompatibility rootProject.ext.androidBuild.javaVersion }
+    kotlinOptions { jvmTarget = rootProject.ext.androidBuild.kotlinJvmTarget }
+}
+dependencies { implementation "androidx.lifecycle:lifecycle-runtime-ktx:${rootProject.ext.androidBuild.lifecycleVersion}" }
+
+

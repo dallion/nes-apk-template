@@ -1,0 +1,1 @@
+APP_SHORT_COMMANDS := true

@@ -1,0 +1,19 @@
+plugins {
+    id 'com.android.application' version '8.13.2' apply false
+    id 'com.android.library' version '8.13.2' apply false
+    id 'org.jetbrains.kotlin.android' version '2.2.10' apply false
+}
+
+ext.androidBuild = [
+    compileSdk: providers.gradleProperty('androidCompileSdk').get().toInteger(),
+    buildToolsVersion: providers.gradleProperty('androidBuildToolsVersion').get(),
+    targetSdk: 36,
+    minSdk: providers.gradleProperty('androidMinSdk').get().toInteger(),
+    ndkVersion: providers.gradleProperty('androidNdkVersion').get(),
+    cmakeVersion: providers.gradleProperty('androidCmakeVersion').get(),
+    javaVersion: JavaVersion.VERSION_17,
+    kotlinJvmTarget: '17',
+    targetAbis: providers.gradleProperty('targetAbis').getOrElse('arm64-v8a').split(',').toList(),
+    lifecycleVersion: '2.9.4'
+]
+

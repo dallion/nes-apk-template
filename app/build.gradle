@@ -1,0 +1,92 @@
+plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
+android { compileSdk rootProject.ext.androidBuild.compileSdk }
+['gameConfig','romFile','cheatFile'].each {
+    if (providers.gradleProperty(it).isPresent()) throw new GradleException('Use -PgameDir=<game directory>; old separate input properties were removed: ' + it)
+}
+def localProperties = new Properties()
+def localPropertiesFile = rootProject.file('local.properties')
+if (localPropertiesFile.isFile()) {
+    localPropertiesFile.withInputStream { localProperties.load(it) }
+}
+def gameDir = providers.gradleProperty('gameDir').getOrElse(localProperties.getProperty('gameDir', ''))
+if (!gameDir.trim()) throw new GradleException('Specify -PgameDir=<game directory> or set gameDir in local.properties; no default game is selected.')
+def gameDirectory = rootProject.file(gameDir)
+def projectPowerShell = rootProject.file('.toolchains/pwsh/pwsh.exe')
+if (!projectPowerShell.isFile()) throw new GradleException('Project PowerShell is missing. Run tools/setup-toolchain.ps1.')
+def resolved = providers.exec {
+    commandLine projectPowerShell.absolutePath, '-NoProfile', '-File', rootProject.file('tools/resolve-game.ps1').absolutePath,
+        '-Game', gameDirectory.absolutePath, '-OutputRoot', rootProject.file('outputs').absolutePath
+    ignoreExitValue = true
+}
+def gameJson = resolved.standardOutput.asText.get()
+if (resolved.result.get().exitValue != 0) throw new GradleException(resolved.standardError.asText.get())
+def game = new groovy.json.JsonSlurper().parseText(gameJson)
+def snapshotPath = providers.gradleProperty('gameInputsSnapshot').getOrElse('')
+if (snapshotPath) {
+    def snapshot = new groovy.json.JsonSlurper().parse(rootProject.file(snapshotPath), 'UTF-8')
+    if (snapshot != game) throw new GradleException('Game inputs changed after packaging started. Retry with the final configuration.')
+    // Freeze identity, naming and input selection for this build, even if the source config changes later.
+    game = snapshot
+}
+def rom = rootProject.file(game.romFile)
+def cheats = game.cheatFile ? rootProject.file(game.cheatFile) : null
+def validateRom = tasks.register('validateRom') {
+    inputs.file rom
+    doLast {
+        if (!rom.isFile()) throw new GradleException('Selected game directory is missing its ROM.')
+        def bytes = rom.bytes
+        if (bytes.length < 16 || bytes[0] != 78 || bytes[1] != 69 || bytes[2] != 83 || bytes[3] != 26)
+            throw new GradleException('game.nes must contain an iNES / NES 2.0 header.')
+    }
+}
+android {
+    namespace = 'com.nes.template'
+    buildToolsVersion rootProject.ext.androidBuild.buildToolsVersion
+    buildFeatures { buildConfig = true }
+    ndkVersion = rootProject.ext.androidBuild.ndkVersion
+    defaultConfig {
+        def digest = java.security.MessageDigest.getInstance('SHA-256')
+        rootProject.fileTree('native/fceumm') { include '**/*.c', '**/*.h', '**/*.mk', 'Makefile*' }.files.sort { it.path }.each {
+            digest.update(rootProject.relativePath(it).getBytes('UTF-8'))
+            digest.update(it.bytes)
+        }
+        buildConfigField 'String', 'CORE_ID', '"' + digest.digest().encodeHex().toString() + '"'
+        applicationId game.applicationId
+        minSdk rootProject.ext.androidBuild.minSdk
+        targetSdk rootProject.ext.androidBuild.targetSdk
+        versionCode game.versionCode.toInteger()
+        versionName game.versionName
+        resValue 'string', 'app_name', game.appName
+        ndk { abiFilters.addAll(rootProject.ext.androidBuild.targetAbis) }
+        externalNativeBuild { ndkBuild { arguments 'NDK_APPLICATION_MK:=' + rootProject.file('native/Application.mk').absolutePath } }
+    }
+    sourceSets.main.assets.srcDirs = [layout.buildDirectory.dir('generated/romAssets')]
+    externalNativeBuild { ndkBuild { path '../native/fceumm/jni/Android.mk' } }
+    packaging { jniLibs { useLegacyPackaging = true } }
+    compileOptions { sourceCompatibility rootProject.ext.androidBuild.javaVersion; targetCompatibility rootProject.ext.androidBuild.javaVersion }
+    kotlinOptions { jvmTarget = rootProject.ext.androidBuild.kotlinJvmTarget }
+    testOptions.unitTests.all {
+        systemProperty 'nes.cheatsFile', cheats?.absolutePath ?: ''
+        if (cheats != null) inputs.file(cheats).withPropertyName('bundledCheats')
+    }
+}
+def packageRom = tasks.register('packageRom', Sync) {
+    dependsOn validateRom
+    from(rom) { rename { 'game.nes' } }
+    if (cheats != null) {
+        inputs.file cheats
+        from(cheats) { rename { 'game.cht' } }
+        doFirst { if (!cheats.isFile()) throw new GradleException('Cheat file not found: ' + cheats) }
+    }
+    into layout.buildDirectory.dir('generated/romAssets')
+}
+tasks.named('preBuild').configure { dependsOn packageRom }
+dependencies {
+    implementation project(':frontend')
+    implementation 'androidx.activity:activity-ktx:1.11.0'
+    implementation "androidx.lifecycle:lifecycle-runtime-ktx:${rootProject.ext.androidBuild.lifecycleVersion}"
+    testImplementation 'junit:junit:4.13.2'
+}
+
+
+

@@ -1,0 +1,14 @@
+.gradle/
+.kotlin/
+.toolchains/
+**/build/
+**/.cxx/
+local.properties
+local-tools.ps1
+*.[nN][eE][sS]
+*.jks
+*.keystore
+outputs/
+work/
+tmp/
+.idea/
