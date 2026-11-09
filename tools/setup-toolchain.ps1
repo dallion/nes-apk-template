@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param([switch]$CheckOnly, [string]$ArchiveDirectory, [string]$SdkSource)
 $ErrorActionPreference = 'Stop'
+$ProgressPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot 'toolchain.ps1')
 $paths = Get-ProjectToolchain
 $lock = Get-Content (Join-Path $PSScriptRoot 'toolchain.lock.json') -Raw | ConvertFrom-Json
@@ -14,6 +15,7 @@ function Install-Archive($name, $spec, $destination, $innerDirectory) {
         throw "Tool version differs: $destination. Keep the existing installation until an explicit replacement."
     }
     if ($CheckOnly) { throw "Missing $name. Run tools/setup-toolchain.ps1." }
+    Write-Output "Preparing $name $($spec.version)"
     if (Test-Path -LiteralPath $destination) { throw "Unmanaged installation: $destination" }
     $cache = Join-Path $paths.Directory 'downloads'
     New-Item -ItemType Directory -Force -Path $cache | Out-Null
@@ -72,10 +74,24 @@ $components = @(
     @{Package='platform-tools';Directory='platform-tools';Required='adb.exe'}
 )
 $missing = @()
+if ($SdkSource -and -not $CheckOnly) {
+    $sourceLicenses = Join-Path $SdkSource 'licenses'
+    if (Test-Path -LiteralPath $sourceLicenses -PathType Container) {
+        $projectLicenses = Join-Path $paths.Sdk 'licenses'
+        New-Item -ItemType Directory -Force -Path $projectLicenses | Out-Null
+        foreach ($license in Get-ChildItem -LiteralPath $sourceLicenses -File) {
+            $target = Join-Path $projectLicenses $license.Name
+            $accepted = @(Get-Content -LiteralPath $license.FullName)
+            if (Test-Path -LiteralPath $target) { $accepted += Get-Content -LiteralPath $target }
+            [IO.File]::WriteAllLines($target, [string[]]@($accepted | Sort-Object -Unique), [Text.UTF8Encoding]::new($false))
+        }
+    }
+}
 foreach ($component in $components) {
     $destination = Join-Path $paths.Sdk $component.Directory
     if (-not (Test-Path -LiteralPath (Join-Path $destination 'source.properties')) -or -not (Test-Path -LiteralPath (Join-Path $destination $component.Required))) {
         if ($CheckOnly) { throw "Missing SDK component: $($component.Package)" }
+        Write-Output "Preparing SDK component $($component.Package)"
         $source = if ($SdkSource) { Join-Path $SdkSource $component.Directory } else { $null }
         if ($source -and (Test-Path -LiteralPath (Join-Path $source 'source.properties'))) {
             Install-ProjectSdkCopy -Source $source -Destination $destination -ToolDirectory $paths.Directory -RequiredFile $component.Required
