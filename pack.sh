@@ -23,6 +23,7 @@ jq -r '
   "包名：\(.applicationId) / 版本：\(.versionName) (\(.versionCode))",
   "ROM：\(.romFile)", "ROM SHA-256：\(.romSha256)",
   "CHT：\(if .cheatFile == "" then "未提供金手指" else .cheatFile end)",
+  "图标：\(if .iconFile == "" then "默认手柄图标" else .iconFile end)",
   "APK：\(.output)"
 ' <<< "$selected"
 jq -r '.warnings[] | "警告：\(.)"' <<< "$selected" >&2

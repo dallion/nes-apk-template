@@ -4,10 +4,11 @@
 
 - Keep personal game collections under `work/<game-directory>/`, excluded from Git. Retain game-specific backups and evidence in an `archive/` subdirectory; use `tmp/` for disposable test inputs and execution output.
 - One directory is one packaging unit. Read direct files only; do not search subdirectories or reference external game files.
-- Require exactly one `.nes` and `game.properties`; allow at most one `.cht`. Match extensions case-insensitively and ignore other files.
+- Require exactly one `.nes` and `game.properties`; allow at most one `.cht` and an optional `icon.png`. Match NES and CHT extensions case-insensitively and ignore other files.
 - Preserve filenames. Recommend matching NES/CHT basenames; warn on a mismatch and pair by directory.
 - Missing CHT is allowed with a notice. Empty or comment-only CHT is allowed with a notice; invalid codes block APK delivery.
 - Package assets internally as `game.nes` and optional `game.cht`. Never retain assets from a previous game.
+- Use the exact filename `icon.png` for a custom launcher icon. Supply a square PNG, preferably 512 × 512 pixels. Transparent backgrounds are supported. If absent, use the default controller icon. Reject invalid images during the Gradle build and report the source path.
 
 ## Configuration and Identity
 
@@ -33,7 +34,7 @@
 - Require an explicit game directory for both entry points. Gradle also accepts `gameDir` in the ignored project `local.properties` for IDE sync and builds; `-PgameDir` takes precedence. Shared build and test scripts must not default to a personal game directory, app identity, or device identifier.
 - Deliver to `outputs/<id>/<appName>-v<versionName>-c<versionCode>-debug.apk`. Replace Windows-invalid filename characters with `_` and trim trailing spaces and periods; retain the original display name in the app.
 - Reject an existing delivery path unless `-Overwrite` is explicit. Failed packaging must preserve existing outputs and deliver no new APK.
-- Before delivery, verify APK identity, version, and ROM/CHT content against the selected inputs. Print ID, display name, package, version, selected files, ROM hash, notices, and output path.
+- Before delivery, verify APK identity, version, and ROM/CHT content against the selected inputs. Gradle verifies the selected icon hash before generating the launcher resource. Print ID, display name, package, version, selected files, ROM hash, notices, and output path.
 
 ## Validation
 

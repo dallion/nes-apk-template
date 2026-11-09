@@ -8,7 +8,9 @@ $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 if(-not (Test-Path -LiteralPath $Game -PathType Container)){throw "游戏目录不存在：$Game"}
 $directory=(Resolve-Path -LiteralPath $Game).ProviderPath
-$files=@(Get-ChildItem -LiteralPath $directory -File -Force)
+$entries=@(Get-ChildItem -LiteralPath $directory -Force)
+$files=@($entries | Where-Object { -not $_.PSIsContainer })
+$icon=$entries | Where-Object Name -ceq 'icon.png'
 $roms=@($files | Where-Object Extension -ieq '.nes')
 $cheats=@($files | Where-Object Extension -ieq '.cht')
 if($roms.Count -ne 1){throw "游戏目录必须恰好一个 NES 文件，实际 $($roms.Count) 个：$directory"}
@@ -16,6 +18,10 @@ if($cheats.Count -gt 1){throw "游戏目录最多一个 CHT 文件，实际 $($c
 $configFile=Join-Path $directory 'game.properties'
 if(-not (Test-Path -LiteralPath $configFile -PathType Leaf)){throw "缺少 game.properties：$directory"}
 $selected=@((Get-Item -LiteralPath $configFile),$roms[0])+$cheats
+if($icon){
+    if($icon.PSIsContainer){throw "图标必须是普通文件：$($icon.FullName)"}
+    $selected+=@($icon)
+}
 foreach($file in $selected){
     if($file.Attributes -band [IO.FileAttributes]::ReparsePoint){throw "游戏输入文件不允许链接或重解析点：$($file.Name)"}
 }
@@ -81,10 +87,12 @@ function FilePart([string]$value){
 $outputName="$(FilePart $appName)-v$(FilePart $versionName)-c$versionCode-debug.apk"
 if($outputName.Length -gt 255){throw '输出文件名超过255字符，请缩短 appName 或 versionName'}
 $output=Join-Path ([IO.Path]::GetFullPath($OutputRoot)) "$id/$outputName"
+$iconHash=if($icon){(Get-FileHash -LiteralPath $icon.FullName -Algorithm SHA256).Hash.ToLowerInvariant()}else{''}
 [ordered]@{
     directory=$directory; id=$id; appName=$appName; applicationId=$applicationId
     versionCode=$versionCode; versionName=$versionName
     romFile=$roms[0].FullName; romSha256=$romHash
     cheatFile=$cheatFile; cheatSha256=$cheatHash; hasCheatCodes=$hasCodes
+    iconFile=([string]$icon.FullName); iconSha256=$iconHash
     output=$output; warnings=@($warnings)
 } | ConvertTo-Json -Compress

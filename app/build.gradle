@@ -1,4 +1,43 @@
 plugins { id 'com.android.application'; id 'org.jetbrains.kotlin.android' }
+
+abstract class PackageGameIcon extends DefaultTask {
+    @InputFile
+    @PathSensitive(PathSensitivity.NONE)
+    abstract RegularFileProperty getIconFile()
+
+    @Input
+    abstract Property<String> getIconSha256()
+
+    @OutputDirectory
+    abstract DirectoryProperty getResources()
+
+    @TaskAction
+    void packageIcon() {
+        def source = iconFile.get().asFile
+        def bytes = source.bytes
+        def digest = java.security.MessageDigest.getInstance('SHA-256').digest(bytes).encodeHex().toString()
+        if (digest != iconSha256.get()) {
+            throw new GradleException("Game icon changed after input selection: ${source}")
+        }
+        def signature = '89504e470d0a1a0a'
+        if (bytes.length < 8 || Arrays.copyOf(bytes, 8).encodeHex().toString() != signature) {
+            throw new GradleException("Game icon must be a PNG: ${source}")
+        }
+        def image
+        try {
+            image = javax.imageio.ImageIO.read(new ByteArrayInputStream(bytes))
+        } catch (IOException e) {
+            throw new GradleException("Invalid PNG game icon: ${source}", e)
+        }
+        if (image == null || image.width != image.height) {
+            throw new GradleException("Game icon must be a valid square PNG: ${source}")
+        }
+        def target = resources.file('mipmap-nodpi/game_icon.png').get().asFile
+        target.parentFile.mkdirs()
+        target.bytes = bytes
+    }
+}
+
 android { compileSdk rootProject.ext.androidBuild.compileSdk }
 ['gameConfig','romFile','cheatFile'].each {
     if (providers.gradleProperty(it).isPresent()) throw new GradleException('Use -PgameDir=<game directory>; old separate input properties were removed: ' + it)
@@ -46,6 +85,7 @@ if (snapshotPath) {
 }
 def rom = rootProject.file(game.romFile)
 def cheats = game.cheatFile ? rootProject.file(game.cheatFile) : null
+def icon = game.iconFile ? rootProject.file(game.iconFile) : null
 def validateRom = tasks.register('validateRom') {
     inputs.file rom
     doLast {
@@ -73,6 +113,7 @@ android {
         versionCode game.versionCode.toInteger()
         versionName game.versionName
         resValue 'string', 'app_name', game.appName
+        manifestPlaceholders.launcherIcon = icon ? '@mipmap/game_icon' : '@drawable/ic_launcher'
         ndk { abiFilters.addAll(rootProject.ext.androidBuild.targetAbis) }
         externalNativeBuild { ndkBuild { arguments 'NDK_APPLICATION_MK:=' + rootProject.file('native/Application.mk').absolutePath } }
     }
@@ -84,6 +125,15 @@ android {
     testOptions.unitTests.all {
         systemProperty 'nes.cheatsFile', cheats?.absolutePath ?: ''
         if (cheats != null) inputs.file(cheats).withPropertyName('bundledCheats')
+    }
+}
+if (icon != null) {
+    androidComponents.onVariants(androidComponents.selector().all()) { variant ->
+        def packageIcon = tasks.register("package${variant.name.capitalize()}GameIcon", PackageGameIcon) {
+            iconFile.set(icon)
+            iconSha256.set(game.iconSha256 as String)
+        }
+        variant.sources.res.addGeneratedSourceDirectory(packageIcon, { it.resources })
     }
 }
 def packageRom = tasks.register('packageRom', Sync) {

@@ -45,7 +45,8 @@ work/
 └─ my-game/
    ├─ game.properties
    ├─ game.nes
-   └─ game.cht          # 可选
+   ├─ game.cht          # 可选
+   └─ icon.png          # 可选
 ```
 
 在 `game.properties` 中填写：
@@ -57,6 +58,8 @@ versionName=1.0
 ```
 
 每个目录包含一个 `.nes`、一份配置和可选的一个 `.cht`。游戏文件可保留原名，支持中文和空格。
+
+如需自定义桌面图标，放入名为 `icon.png` 的正方形 PNG，推荐 512 × 512 像素，支持透明背景。省略该文件时使用默认手柄图标。
 
 ### 3. 构建 APK
 
@@ -124,7 +127,7 @@ versionName=1.0
 
 同名 APK 已存在时，需要显式指定 `-Overwrite`。打包失败会保留原文件。
 
-`-CheckOnly` 检查输入文件和配置；CHT 代码语法在实际打包时校验。包含 CHT 的游戏会自动运行单元测试。
+`-CheckOnly` 检查输入文件和配置。CHT 代码语法与 PNG 图片内容在实际打包时校验。包含 CHT 的游戏会自动运行单元测试。
 
 ## 在 IDE 中开发
 

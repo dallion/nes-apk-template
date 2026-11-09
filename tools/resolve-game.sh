@@ -23,7 +23,12 @@ config_file="$directory/game.properties"
 shopt -s nullglob dotglob
 roms=()
 cheats=()
+icon_file=
 for file in "$directory"/*; do
+  if [[ "${file##*/}" == icon.png ]]; then
+    [[ -f "$file" && ! -L "$file" ]] || fail "图标必须是普通文件：$file"
+    icon_file="$file"
+  fi
   [[ ! -d "$file" && ( -f "$file" || -L "$file" ) ]] || continue
   case "$file" in
     *.[nN][eE][sS]) roms+=("$file") ;;
@@ -102,9 +107,12 @@ else
   fi
 fi
 
+icon_hash=
+if [[ -n "$icon_file" ]]; then icon_hash="$(sha256 < "$icon_file")"; fi
 jq -cn --argjson config "$config" --arg directory "$directory" --arg outputRoot "$output_root" \
   --arg romFile "$rom_file" --arg romSha256 "$rom_hash" --arg defaultName "${rom_name%.*}" \
-  --arg cheatFile "$cheat_file" --arg cheatSha256 "$cheat_hash" --argjson hasCheatCodes "$has_codes" '
+  --arg cheatFile "$cheat_file" --arg cheatSha256 "$cheat_hash" --argjson hasCheatCodes "$has_codes" \
+  --arg iconFile "$icon_file" --arg iconSha256 "$icon_hash" '
     def file_part: gsub("[<>:\"/\\\\|?*\u0000-\u001f]"; "_") | sub("[ .]+$"; "") | if . == "" then "_" else . end;
     ($config.appName // $defaultName) as $appName
     | if ($appName | test("^[\\s\u0085\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]*$|[\u0000-\u001f]"))
@@ -118,5 +126,6 @@ jq -cn --argjson config "$config" --arg directory "$directory" --arg outputRoot 
     | {directory: $directory, id: $config.id, $appName, $applicationId,
        versionCode: $config.versionCode, versionName: $config.versionName,
        $romFile, $romSha256, $cheatFile, $cheatSha256, $hasCheatCodes,
+       $iconFile, $iconSha256,
        output: ($outputRoot + "/" + $config.id + "/" + $filename), warnings: $ARGS.positional}
   ' --args ${warnings[@]+"${warnings[@]}"}
