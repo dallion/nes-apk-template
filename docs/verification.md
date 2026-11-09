@@ -1,10 +1,8 @@
 # 验证指南
 
-环境准备见 [使用说明](../README.md)，输入和交付约束见 [打包规则](packaging.md)。命令从仓库根目录、项目内 PowerShell 中执行；设备标识和待测游戏目录由执行者提供。
+环境准备见 [使用说明](../README.md)，输入和交付约束见 [打包规则](packaging.md)。在仓库根目录执行命令，显式指定设备和待测游戏。
 
-以下环境检查命令使用 Windows 入口；macOS / Linux 用 `./tools/setup-toolchain.sh -CheckOnly`、`./.toolchains/pwsh/pwsh` 和 `./gradlew` 替换对应命令。
-
-工具环境检查：
+Windows 工具检查
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-toolchain.ps1 -CheckOnly
@@ -12,11 +10,18 @@ powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-toolchain.ps1 -C
 ./gradlew.bat --version
 ```
 
-确认 JDK、PowerShell 和 SDK 组件版本符合项目配置，Gradle 的 Launcher JVM 和 Daemon JVM 指向项目 JDK。重复运行准备入口后，本地游戏选择应保持不变；环境检查和打包结束后，调用终端的 JAVA_HOME、SDK 和 PATH 应恢复。
+Linux / macOS 工具检查
+
+```bash
+./tools/setup-toolchain.sh -CheckOnly
+./gradlew --version
+```
+
+确认工具版本符合项目配置，Gradle 的 Launcher JVM 和 Daemon JVM 指向项目 JDK。重复运行准备入口后，本地游戏选择应保持不变。环境检查和打包结束后，调用终端的 JAVA_HOME、SDK 和 PATH 应保持原值。
 
 ## 构建与输入检查
 
-安装 Node.js 后，可运行 `./tests/build-checks.ps1` 生成自编测试 ROM 和独立配置，依次执行工具链检查、打包输入检查、单元测试、APK 打包和 lint。GitHub Actions 使用同一入口。
+安装 Node.js 后，在 Windows 运行 `./tests/build-checks.ps1`，在 Linux / macOS 运行 `bash tests/build-checks.sh`。各入口生成自编测试 ROM 和独立配置，执行工具链检查、打包输入检查、单元测试、APK 打包和 lint。GitHub Actions 按宿主平台调用对应入口，Unix 任务检查项目中未安装 PowerShell。
 
 Gradle 发行包下载失败时，构建检查从同一官方发布资产预取文件，按 Wrapper 配置中的 SHA-256 核验后放入标准缓存，再由原 Wrapper 继续启动。
 
@@ -26,11 +31,19 @@ Gradle 发行包下载失败时，构建检查从同一官方发布资产预取�
 ./gradlew.bat -PgameDir=<game-directory> :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
+Linux / macOS 运行：
+
+```bash
+bash tests/pack-checks.sh
+bash ./pack.sh -Game <game-directory> -CheckOnly
+./gradlew -PgameDir=<game-directory> :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+```
+
 将 `<game-directory>` 替换为待测游戏目录。根目录 `gradle.properties` 默认包含 arm64-v8a 和 x86_64；仅验证模拟器时可用 `-PtargetAbis=x86_64`，仅验证 ARM64 手机时可用 `-PtargetAbis=arm64-v8a`。
 
 验证 IDE 构建时，先运行工具准备入口，在 `local.properties` 显式配置 `gameDir`，将 Gradle JDK 选择为 `GRADLE_LOCAL_JAVA_HOME`，SDK 冲突时选择项目 SDK；重新同步 Gradle，再执行“构建项目”。同步与构建均应成功，构建日志中的 JDK、SDK 和原生工具路径均应位于本项目 `.toolchains/`。另用 `-PgameDir` 指定其他目录，确认命令行选择优先于本地配置。
 
-`pack-checks.ps1` 自行生成输入夹具，检查目录数量、扩展名、名称配对、配置与编码、摘要、身份、输出冲突及路径处理。检查输出中的失败和跳过项，确认符号链接用例是否执行。
+两个打包检查入口读取同一份 `tests/packaging-cases.json` 并分别生成测试输入，检查目录内容、扩展名、名称配对、编码、摘要和应用身份。各入口另测相对路径、符号链接和输出冲突。检查报告中的失败和跳过项。
 
 JVM 测试覆盖输入、触屏布局、设备分类、倍率按键、FPS、存储和金手指逻辑。它们不替代设备端启动、音视频与输入检查。
 
@@ -38,7 +51,7 @@ JVM 测试覆盖输入、触屏布局、设备分类、倍率按键、FPS、存�
 
 在独立测试目录和测试应用身份下执行，保留已有产物作为比较基准：
 
-1. 使用合法 ROM/CHT 构建，通过 `pack.ps1` 交付前核验包名、版本及包内 ROM/CHT 摘要；需要时使用 SDK 的 APK 分析与签名工具复核元数据、ABI 和签名。
+1. 使用合法 ROM/CHT 构建。对应平台的打包入口在交付前核验包名、版本及包内 ROM/CHT 摘要。需要时使用 SDK 的 APK 分析与签名工具复核元数据、ABI 和签名。
 2. 不加 `-Overwrite` 再次交付到同一路径，应拒绝且旧产物摘要不变；显式覆盖时应完成核验后替换。
 3. 将 CHT 改为非法代码，实际打包应失败且不改变已有交付 APK。`-CheckOnly` 不能替代应用解析器的代码语法校验。
 4. 在相同 CHT 路径修改内容后重建，确认测试重新读取输入，而非复用旧测试结果。
@@ -54,6 +67,8 @@ JVM 测试覆盖输入、触屏布局、设备分类、倍率按键、FPS、存�
 需验证声音时，应启用宿主音频并实际试听。Android Gamepad 来源的注入事件可以检查事件路由，实体蓝牙或 USB 手柄的枚举、键码、斜向、同按、断连释放和延迟需用实际手柄另测。
 
 ## 桌面返回与存储
+
+设备回归脚本示例使用 Windows PowerShell 打包环境。
 
 先手动启动测试应用，再执行桌面返回回归。`Device` 为必填参数；测试包应使用独立身份并显式指定 `Package`：
 
@@ -89,6 +104,8 @@ JVM 测试覆盖输入、触屏布局、设备分类、倍率按键、FPS、存�
 node ./tests/native/make-cheat-rom.cjs <test-game-directory>/probe.nes
 ./pack.ps1 -Game <test-game-directory> -Test
 ```
+
+Linux / macOS 使用 `bash ./pack.sh -Game <test-game-directory> -Test`。
 
 该 Mapper 246 ROM 用 CPU RAM `0x6800` 控制背景调色板。以下操作检查解析、UI、持久化及核心注入的整条链路：
 

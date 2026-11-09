@@ -87,4 +87,39 @@ $linkCreated=$false
 try { New-Item -ItemType SymbolicLink -Path (Join-Path $d '测试游戏.nes') -Target $source -ErrorAction Stop | Out-Null; $linkCreated=$true }
 catch { Write-Output "SKIP symbolic-link check (creation unavailable): $($_.Exception.Message)" }
 if($linkCreated){Check 'linked-rom' $d $false '链接|重解析点'}
+foreach ($fixture in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'packaging-cases.json') -Raw | ConvertFrom-Json -AsHashtable)) {
+    $name = 'shared-' + $fixture.name
+    $config = "id=$($fixture.id ?? 'test_game')`nversionCode=$($fixture.versionCode ?? '1')`nversionName=$($fixture.versionName ?? '1.0')`n$($fixture.config)"
+    $directory = Join-Path $scratch $name
+    New-Item -ItemType Directory $directory | Out-Null
+    $configFile = Join-Path $directory 'game.properties'
+    if ($fixture.invalidUtf8) { [IO.File]::WriteAllBytes($configFile, [byte[]](255,254,255)) }
+    else { [IO.File]::WriteAllText($configFile, $config, [Text.UTF8Encoding]::new([bool]$fixture.bom)) }
+    $romFile = Join-Path $directory '测试 游戏.NES'
+    if ($fixture.invalidRom) { [IO.File]::WriteAllText($romFile, 'invalid') }
+    elseif (-not $fixture.noRom) { [IO.File]::WriteAllBytes($romFile, $rom) }
+    if ($fixture.secondRom) { Copy-Item -LiteralPath $romFile -Destination (Join-Path $directory 'second.nes') }
+    if ($fixture.nestedRom) {
+        $nested = Join-Path $directory 'nested'
+        New-Item -ItemType Directory $nested | Out-Null
+        Copy-Item -LiteralPath $romFile -Destination (Join-Path $nested 'second.nes')
+    }
+    if ($fixture.Contains('cheat')) {
+        $encoding = [Text.Encoding]::GetEncoding(($fixture.encoding ?? 'UTF-8'))
+        [IO.File]::WriteAllBytes((Join-Path $directory ($fixture.cheatName ?? '测试 游戏.CHT')), $encoding.GetBytes($fixture.cheat))
+    }
+    if ($fixture.secondCheat) { [IO.File]::WriteAllText((Join-Path $directory 'second.cht'), '') }
+    if ($fixture.oversizeCheat) { [IO.File]::WriteAllBytes((Join-Path $directory 'large.cht'), [byte[]]::new(131073)) }
+    if ($fixture.error) {
+        Check $name $directory $false ([regex]::Escape($fixture.error))
+        continue
+    }
+    Check $name $directory $true 'APK'
+    $actual = & (Join-Path $root 'tools/resolve-game.ps1') -Game $directory | ConvertFrom-Json -AsHashtable
+    foreach ($key in $fixture.expect.Keys) {
+        if ($actual[$key] -cne $fixture.expect[$key]) { throw "FAIL $name snapshot property: $key" }
+    }
+    if ($fixture.filename -and [IO.Path]::GetFileName($actual.output) -cne $fixture.filename) { throw "FAIL $name filename" }
+    if ($fixture.warning -and -not ($actual.warnings -cmatch ([regex]::Escape($fixture.warning)))) { throw "FAIL $name warning" }
+}
 Write-Output "All $passed packaging input checks passed. Logs: $scratch"

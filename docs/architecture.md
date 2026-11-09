@@ -13,7 +13,7 @@
 - `app/` 管理界面、Android 输入、菜单、存档和金手指列表。
 - `frontend/` 将 LibretroDroid 的 Java/Kotlin 接口及 CMake 原生宿主接入构建。
 - `native/fceumm/` 提供 libretro 核心；Mapper 和核心金手指适配在此实现。
-- `tools/resolve-game.ps1` 统一解析游戏目录，`pack.ps1` 与 Gradle 消费同一结果。
+- `tools/resolve-game.ps1` 与 `tools/resolve-game.sh` 分别解析 Windows 与 Unix 的游戏目录，供对应打包入口和 Gradle 使用。
 
 UI 和输入处理留在 Android 层，Mapper 适配留在内核。ROM 从 assets 写入应用私有目录，以完整文件路径加载，满足 FCEUmm 的 `need_fullpath` 要求。
 
@@ -37,6 +37,6 @@ UI 和输入处理留在 Android 层，Mapper 适配留在内核。ROM 从 asset
 
 ## 打包一致性
 
-目录解析集中在 PowerShell 7，避免脚本与 Gradle 各自维护一套输入规则。打包入口建立配置快照，Gradle 比较当前解析结果后固定使用快照；交付前再次核对 APK 身份及 ROM/CHT 摘要，避免构建期间输入变化导致交付内容错误。
+Windows 使用 PowerShell，Linux 和 macOS 使用 Bash。各自负责环境准备、输入校验和 APK 交付。Gradle 按宿主平台调用解析器并编译同一份应用源码。打包入口建立配置快照，Gradle 复查当前输入并将本次构建的 APK 和元数据暂存到快照旁。对应的打包入口核对身份及 ROM/CHT 摘要后交付。两套实现使用相同的配置规则、快照格式和测试数据。
 
 身份、命名、覆盖保护和资源清理的完整约束统一维护在 [打包规则](packaging.md)。

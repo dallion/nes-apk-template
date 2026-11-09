@@ -4,6 +4,7 @@ $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
 . (Join-Path $PSScriptRoot 'toolchain.ps1')
 $paths = Get-ProjectToolchain
+if (-not $paths.IsWindows) { throw 'Use tools/setup-toolchain.sh on Linux or macOS.' }
 $lock = Get-Content (Join-Path $PSScriptRoot 'toolchain.lock.json') -Raw | ConvertFrom-Json
 $lock = $lock.platforms.($paths.Platform)
 if (-not $lock) { throw "No toolchain lock for $($paths.Platform)." }
@@ -65,7 +66,7 @@ function Install-Archive($name, $spec, $destination, $innerDirectory) {
     $spec | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $source '.project-toolchain.json') -Encoding UTF8
     Move-Item -LiteralPath $source -Destination $destination
 }
-$jdkInner = "jdk-$($lock.jdk.version)" + $(if ($paths.Platform.StartsWith('macos-')) { '/Contents/Home' } else { '' })
+$jdkInner = "jdk-$($lock.jdk.version)"
 Install-Archive 'jdk' $lock.jdk $paths.Jdk $jdkInner
 Install-Archive 'pwsh' $lock.pwsh (Split-Path $paths.PowerShell -Parent) ''
 if ($PSVersionTable.PSVersion.Major -lt 7) {
@@ -80,14 +81,6 @@ if ($PSVersionTable.PSVersion.Major -lt 7) {
     return
 }
 Install-Archive 'android-command-line-tools' $lock.androidCommandLineTools (Join-Path $paths.Sdk "cmdline-tools/$($lock.androidCommandLineTools.version)") 'cmdline-tools'
-if (-not $paths.IsWindows -and -not $CheckOnly) {
-    & chmod +x $paths.PowerShell
-    if ($LASTEXITCODE -ne 0) { throw 'Cannot make project PowerShell executable.' }
-    Get-ChildItem (Join-Path $paths.Sdk "cmdline-tools/$($lock.androidCommandLineTools.version)/bin") -File | ForEach-Object {
-        & chmod +x $_.FullName
-        if ($LASTEXITCODE -ne 0) { throw 'Cannot make SDK command executable.' }
-    }
-}
 $jdkRelease = Get-Content -LiteralPath (Join-Path $paths.Jdk 'release') -Raw
 if ($jdkRelease -notmatch ('(?m)^JAVA_RUNTIME_VERSION="' + [regex]::Escape($lock.jdk.version) + '-LTS"')) { throw 'Project JDK version does not match the lock file.' }
 Invoke-ProjectToolchain {
@@ -100,8 +93,8 @@ Invoke-ProjectToolchain {
 }
 
 $properties = Get-Content (Join-Path $paths.Root 'gradle.properties') -Raw | ConvertFrom-StringData
-$exe = if ($paths.IsWindows) { '.exe' } else { '' }
-$script = if ($paths.IsWindows) { '.cmd' } else { '' }
+$exe = '.exe'
+$script = '.cmd'
 $components = @(
     @{Package="platforms;android-$($properties.androidCompileSdk)";Directory="platforms/android-$($properties.androidCompileSdk)";Required='android.jar'},
     @{Package="build-tools;$($properties.androidBuildToolsVersion)";Directory="build-tools/$($properties.androidBuildToolsVersion)";Required="aapt2$exe"},
@@ -145,8 +138,7 @@ foreach ($component in $components) {
 }
 if ($missing.Count) {
     Invoke-ProjectToolchain {
-        $managerName = if ($paths.IsWindows) { 'sdkmanager.bat' } else { 'sdkmanager' }
-        $manager = Join-Path $paths.Sdk "cmdline-tools/$($lock.androidCommandLineTools.version)/bin/$managerName"
+        $manager = Join-Path $paths.Sdk "cmdline-tools/$($lock.androidCommandLineTools.version)/bin/sdkmanager.bat"
         if ($AcceptAndroidLicenses) {
             1..100 | ForEach-Object { 'y' } | & $manager "--sdk_root=$($paths.Sdk)" --licenses
             if ($LASTEXITCODE -ne 0) { throw 'SDK license acceptance failed.' }

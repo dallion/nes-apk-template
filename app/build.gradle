@@ -11,11 +11,18 @@ if (localPropertiesFile.isFile()) {
 def gameDir = providers.gradleProperty('gameDir').getOrElse(localProperties.getProperty('gameDir', ''))
 if (!gameDir.trim()) throw new GradleException('Specify -PgameDir=<game directory> or set gameDir in local.properties; no default game is selected.')
 def gameDirectory = rootProject.file(gameDir)
-def projectPowerShell = rootProject.file(System.getProperty('os.name').toLowerCase().startsWith('windows') ? '.toolchains/pwsh/pwsh.exe' : '.toolchains/pwsh/pwsh')
-if (!projectPowerShell.isFile()) throw new GradleException('Project PowerShell is missing. Run tools/setup-toolchain.ps1.')
+def resolver
+def outputRoot = rootProject.file('outputs').absolutePath
+if (System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('windows')) {
+    def projectPowerShell = rootProject.file('.toolchains/pwsh/pwsh.exe')
+    if (!projectPowerShell.isFile()) throw new GradleException('Project PowerShell is missing. Run tools/setup-toolchain.ps1.')
+    resolver = [projectPowerShell.absolutePath, '-NoProfile', '-File', rootProject.file('tools/resolve-game.ps1').absolutePath]
+} else {
+    resolver = ['/bin/bash', rootProject.file('tools/resolve-game.sh').absolutePath]
+    outputRoot = new File(rootProject.projectDir.canonicalFile, 'outputs').path
+}
 def resolved = providers.exec {
-    commandLine projectPowerShell.absolutePath, '-NoProfile', '-File', rootProject.file('tools/resolve-game.ps1').absolutePath,
-        '-Game', gameDirectory.absolutePath, '-OutputRoot', rootProject.file('outputs').absolutePath
+    commandLine resolver + ['-Game', gameDirectory.absolutePath, '-OutputRoot', outputRoot]
     ignoreExitValue = true
 }
 def gameJson = resolved.standardOutput.asText.get()
@@ -23,10 +30,19 @@ if (resolved.result.get().exitValue != 0) throw new GradleException(resolved.sta
 def game = new groovy.json.JsonSlurper().parseText(gameJson)
 def snapshotPath = providers.gradleProperty('gameInputsSnapshot').getOrElse('')
 if (snapshotPath) {
-    def snapshot = new groovy.json.JsonSlurper().parse(rootProject.file(snapshotPath), 'UTF-8')
+    def snapshotFile = rootProject.file(snapshotPath)
+    def snapshot = new groovy.json.JsonSlurper().parse(snapshotFile, 'UTF-8')
     if (snapshot != game) throw new GradleException('Game inputs changed after packaging started. Retry with the final configuration.')
     // Freeze identity, naming and input selection for this build, even if the source config changes later.
     game = snapshot
+    // Capture this invocation's APK and metadata before Gradle releases the build directory.
+    tasks.register('stageDebugApk', Copy) {
+        dependsOn 'assembleDebug'
+        from(layout.buildDirectory.dir('outputs/apk/debug')) {
+            include 'app-debug.apk', 'output-metadata.json'
+        }
+        into new File(snapshotFile.path + '.apk')
+    }
 }
 def rom = rootProject.file(game.romFile)
 def cheats = game.cheatFile ? rootProject.file(game.cheatFile) : null

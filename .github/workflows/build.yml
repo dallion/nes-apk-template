@@ -53,7 +53,15 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
-        run: ./tools/setup-toolchain.sh -SdkSource "${ANDROID_HOME:-}" -AcceptAndroidLicenses
+        run: |
+          guard="$RUNNER_TEMP/no-powershell"
+          mkdir -p "$guard"
+          printf '%s\n' '#!/bin/sh' 'echo "PowerShell is unavailable to the Unix build" >&2' 'exit 127' > "$guard/pwsh"
+          chmod +x "$guard/pwsh"
+          ln -s pwsh "$guard/powershell"
+          export PATH="$guard:$PATH"
+          printf '%s\n' "$guard" >> "$GITHUB_PATH"
+          ./tools/setup-toolchain.sh -SdkSource "${ANDROID_HOME:-}" -AcceptAndroidLicenses
       - uses: gradle/actions/wrapper-validation@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           # Matches the fixed LibretroDroid and Oboe upstream commits in DEPENDENCIES.md.
@@ -61,12 +69,13 @@ jobs:
       - uses: gradle/actions/setup-gradle@8da46b539cd8fe6ab27ca75128919a18d757604c # v6.4.1
         with:
           validate-wrappers: false # Validated above, including the pinned upstream wrappers.
-      - name: Test, package and lint
+      - name: Test, package and lint (Windows)
+        if: runner.os == 'Windows'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: pwsh
         run: |
-          $pwsh = if ($IsWindows) { './.toolchains/pwsh/pwsh.exe' } else { './.toolchains/pwsh/pwsh' }
+          $pwsh = './.toolchains/pwsh/pwsh.exe'
           $logs = 'tmp/' + (Get-Date -Format 'yyyy-MM-dd') + '-ci-checks'
           New-Item -ItemType Directory -Force -Path $logs | Out-Null
           for ($attempt = 1; $attempt -le 3; $attempt++) {
@@ -81,6 +90,34 @@ jobs:
             }
             Start-Sleep -Seconds 5
           }
+      - name: Test, package and lint (Unix)
+        if: runner.os != 'Windows'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          test ! -e .toolchains/pwsh
+          logs="tmp/$(date +%F)-ci-checks"
+          mkdir -p "$logs"
+          for attempt in 1 2 3; do
+            log="$logs/attempt-$attempt.log"
+            if bash tests/build-checks.sh 2>&1 | tee "$log"; then
+              test ! -e .toolchains/pwsh
+              break
+            fi
+            if [[ "$attempt" == 3 ]] || ! awk '
+              /\* What went wrong:/ { reason = ""; active = 1; next }
+              /\* Try:/ { active = 0 }
+              active { reason = reason " " tolower($0) }
+              END {
+                exit !(reason ~ /(http (response code: |error )?(429|500|502|503|504)|status code:? (429|500|502|503|504)|connection (timed out|reset)|read timed out)/)
+              }
+            ' "$log"; then
+              echo 'Build checks failed.' >&2
+              exit 1
+            fi
+            sleep 5
+          done
       - name: Upload reports and test APK
         if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2

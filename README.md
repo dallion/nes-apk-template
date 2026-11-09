@@ -26,7 +26,7 @@ Windows 在仓库根目录运行：
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-toolchain.ps1
 ```
 
-macOS / Linux 需要 `curl`、`tar` 和 `jq`，在仓库根目录运行：
+macOS / Linux 需要 Bash、`curl`、`tar`、`unzip`、`iconv` 和 `jq`，在仓库根目录运行：
 
 ```bash
 ./tools/setup-toolchain.sh
@@ -34,7 +34,7 @@ macOS / Linux 需要 `curl`、`tar` 和 `jq`，在仓库根目录运行：
 
 首次运行会下载工具并安装到 `.toolchains/`，SDK 安装时按提示确认许可证。后续运行复用已有工具；添加 `-CheckOnly` 可检查环境。
 
-后续命令在项目 PowerShell 中执行：Windows 启动 `./.toolchains/pwsh/pwsh.exe`，macOS / Linux 启动 `./.toolchains/pwsh/pwsh`。
+Windows 安装项目内的 PowerShell 7。Linux / macOS 的构建和打包直接在终端执行。
 
 ### 2. 添加游戏
 
@@ -60,11 +60,19 @@ versionName=1.0
 
 ### 3. 构建 APK
 
+Windows
+
 ```powershell
 ./pack.ps1 -Game work/my-game
 ```
 
-上述示例生成：
+Linux / macOS
+
+```bash
+bash ./pack.sh -Game work/my-game
+```
+
+两条命令生成同样命名的 APK。
 
 ```text
 outputs/my_game/game-v1.0-c1-debug.apk
@@ -101,7 +109,7 @@ versionName=1.0
 
 ## 常用打包操作
 
-在项目内 PowerShell 中执行：
+以下示例使用 Windows 入口。Linux / macOS 将 `./pack.ps1` 换为 `bash ./pack.sh`，参数相同。
 
 ```powershell
 # 检查游戏目录和配置
@@ -140,7 +148,7 @@ versionName=1.0
 
 macOS / Linux 使用 `./gradlew`。两个入口均选择项目内 JDK 和 Android SDK。
 
-`-PgameDir` 优先于 `local.properties` 中的选择。Gradle 输出位于 `app/build/outputs/apk/debug/`；按游戏配置命名和交付 APK 使用 `pack.ps1`。
+`-PgameDir` 优先于 `local.properties` 中的选择。Gradle 输出位于 `app/build/outputs/apk/debug/`。使用对应平台的打包入口按游戏配置命名和交付 APK。
 
 ## 金手指与存档
 
@@ -152,11 +160,18 @@ macOS / Linux 使用 `./gradlew`。两个入口均选择项目内 JDK 和 Androi
 
 ## 构建检查
 
-在项目内 PowerShell 中运行：
+Windows 在项目内 PowerShell 中运行：
 
 ```powershell
 ./tests/pack-checks.ps1
 ./gradlew.bat -PgameDir=work/my-game :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
+```
+
+Linux / macOS 运行：
+
+```bash
+bash tests/pack-checks.sh
+./gradlew -PgameDir=work/my-game :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
 设备端的启动、输入、存档和金手指测试见 [验证指南](docs/verification.md)。
