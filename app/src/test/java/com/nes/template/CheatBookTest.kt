@@ -27,4 +27,17 @@ class CheatBookTest {
         storage.writeCheats(byteArrayOf(1,2,3))
         assertThrows(Exception::class.java) { CheatBook(storage) }
     }
+    @Test fun editingGroupedEntryKeepsItsFlagAndReplacesBothValues() {
+        val storage = GameStorage(folder.root,byteArrayOf(1))
+        val book = CheatBook(storage)
+        book.replace(listOf(CheatEntry("物品","60D8:54 612C:01",true)))
+        book.replace(listOf(book.entries.single().copy(code="60D8:64 612C:07")))
+        val reopened = CheatBook(storage)
+        assertTrue(reopened.entries.single().enabled)
+        assertEquals(listOf("RAM:60D8:64","RAM:612C:07"),reopened.activeCodes())
+        assertThrows(IllegalArgumentException::class.java) {
+            reopened.replace(listOf(reopened.entries.single().copy(code="60D8:64 612C:100")))
+        }
+        assertEquals(book.entries,CheatBook(storage).entries)
+    }
 }

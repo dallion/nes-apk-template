@@ -17,7 +17,6 @@
 
 package com.swordfish.libretrodroid
 
-import android.app.ActivityManager
 import android.content.Context
 import android.graphics.PointF
 import android.graphics.RectF
@@ -85,7 +84,7 @@ class GLRetroView(
     private var lifecycle: Lifecycle? = null
 
     init {
-        openGLESVersion = getGLESVersion(context)
+        openGLESVersion = 2
         preserveEGLContextOnPause = true
         setEGLContextClientVersion(openGLESVersion)
         setRenderer(Renderer())
@@ -236,15 +235,6 @@ class GLRetroView(
 
     fun changeDisk(index: Int, useEmulationThread: Boolean = true) {
         runOnEmulationThread(useEmulationThread) { LibretroDroid.changeDisk(index) }
-    }
-
-    private fun getGLESVersion(context: Context): Int {
-        val activityManager = context.getSystemService(Context.ACTIVITY_SERVICE) as ActivityManager
-        return if (activityManager.deviceConfigurationInfo.reqGlEsVersion >= 0x30000) {
-            3
-        } else {
-            2
-        }
     }
 
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
