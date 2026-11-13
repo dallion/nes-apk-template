@@ -78,8 +78,10 @@ object CheatParser {
             } else {
                 val title = requireNotNull(section) { "代码前需要 [名称]" }
                 val pair = line.split('=',limit=2)
-                require(pair.size == 2 && pair[0].isNotBlank()) { "需要 on=地址,字节 格式" }
+                require(pair.size == 2 && pair[0].isNotBlank()) { "需要 on=地址,字节 或 on=Game Genie 格式" }
                 val codes = pair[1].split(';').flatMap { segment ->
+                    val token = segment.trim().uppercase(Locale.ROOT)
+                    if(genie.matches(token)) return@flatMap listOf(token)
                     val parts = segment.split(',').map { it.trim() }
                     require(parts.size >= 2 && parts[0].matches(Regex("[0-9A-Fa-f]{1,4}"))) { "地址格式错误" }
                     val address = parts[0].toInt(16)

@@ -1,3 +1,4 @@
 <resources>
     <string name="fps_pending" translatable="false">FPS —</string>
+    <string name="speed_status">速度 %1$d×</string>
 </resources>

@@ -16,6 +16,19 @@ class CheatParserTest {
         assertEquals(listOf("8000:63"),CheatParser.nativeCodes("8000:63"))
         assertEquals(2,CheatParser.parse("SXIOPO  Lives\n\n;ignore\n6800:63  Money").size)
     }
+
+    @Test fun groupsGameGenieCodesAndRamWritesUnderOnePreset() {
+        val entry = CheatParser.parseBundled("[组合预设]\non=egvuzkog;XVOLGGYO;602C,7F,96,98").single()
+        assertEquals("组合预设",entry.name)
+        assertFalse(entry.enabled)
+        assertEquals(
+            listOf("EGVUZKOG","XVOLGGYO","RAM:602C:7F","RAM:602D:96","RAM:602E:98"),
+            CheatParser.nativeCodes(entry.code)
+        )
+        assertThrows(IllegalArgumentException::class.java) {
+            CheatParser.parseBundled("[组合预设]\non=EGVUZKOG;invalid")
+        }
+    }
     @Test fun rejectsBadCodeOverflowAndNonRamVct() {
         for(code in listOf("BBBBBB","6800-00-01","6800-05-01","6800-01-100","7FFF-02-1234","8000-01-01","6800:6","RAM:6800:63")) {
             assertThrows(code,IllegalArgumentException::class.java) { CheatParser.nativeCodes(code) }
