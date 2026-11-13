@@ -1,4 +1,4 @@
-$ErrorActionPreference = 'Stop'
+﻿$ErrorActionPreference = 'Stop'
 $root = Split-Path $PSScriptRoot -Parent
 $pack = Join-Path $root 'pack.ps1'
 $scratch = Join-Path $root ("tmp/"+(Get-Date -Format 'yyyy-MM-dd')+"-pack-checks/"+[guid]::NewGuid().ToString('N'))
@@ -17,7 +17,11 @@ function Case($name,$config=$good) {
 }
 function Check($name,$dir,$success,$message) {
     $log=Join-Path $scratch "$name.log"
-    & $shell -NoProfile -File $pack -Game $dir -CheckOnly *> $log
+    $output = & {
+        $ErrorActionPreference = 'Continue'
+        & $shell -NoProfile -File $pack -Game $dir -CheckOnly 2>&1
+    }
+    $output | Set-Content -LiteralPath $log -Encoding UTF8
     $actual=$LASTEXITCODE -eq 0
     $text=Get-Content -LiteralPath $log -Raw
     if($actual -ne $success -or $text -notmatch $message){throw "FAIL $name expected=$success / $message`n$text"}
@@ -47,7 +51,7 @@ $d=Case 'bad-package' ($good+"applicationId=bad-id`n"); Check 'bad-package' $d $
 $d=Case 'override' ($good+"appName=自定名称`napplicationId=com.example.identity_override`n"); Check 'override' $d $true 'com.example.identity_override'
 $d=Case 'bad-rom'; [IO.File]::WriteAllText((Join-Path $d '测试游戏.nes'),'invalid'); Check 'bad-rom' $d $false 'iNES'
 $d=Case 'nested'; New-Item -ItemType Directory (Join-Path $d 'nested') | Out-Null; [IO.File]::WriteAllBytes((Join-Path $d 'nested/ignore.nes'),$rom); Check 'nested' $d $true 'com.nes.game.test_game'
-$hash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($rom)).ToLower()
+$hash=(Get-FileHash -LiteralPath (Join-Path $d '测试游戏.nes') -Algorithm SHA256).Hash.ToLowerInvariant()
 $d=Case 'bound' ($good+"cheatsRomSha256=$hash`n"); [IO.File]::WriteAllText((Join-Path $d '测试游戏.cht'),'534-01-FA'); Check 'bound' $d $true $hash
 $d=Case 'unbound'; [IO.File]::WriteAllText((Join-Path $d '测试游戏.cht'),'534-01-FA'); Check 'unbound' $d $true '未绑定'
 $d=Case 'wrong-hash' ($good+"cheatsRomSha256=$('0'*64)`n"); [IO.File]::WriteAllText((Join-Path $d '测试游戏.cht'),'534-01-FA'); Check 'wrong-hash' $d $false '摘要不匹配'
@@ -87,9 +91,9 @@ $linkCreated=$false
 try { New-Item -ItemType SymbolicLink -Path (Join-Path $d '测试游戏.nes') -Target $source -ErrorAction Stop | Out-Null; $linkCreated=$true }
 catch { Write-Output "SKIP symbolic-link check (creation unavailable): $($_.Exception.Message)" }
 if($linkCreated){Check 'linked-rom' $d $false '链接|重解析点'}
-foreach ($fixture in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'packaging-cases.json') -Raw | ConvertFrom-Json -AsHashtable)) {
+foreach ($fixture in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'packaging-cases.json') -Raw -Encoding UTF8 | ConvertFrom-Json)) {
     $name = 'shared-' + $fixture.name
-    $config = "id=$($fixture.id ?? 'test_game')`nversionCode=$($fixture.versionCode ?? '1')`nversionName=$($fixture.versionName ?? '1.0')`n$($fixture.config)"
+    $config = "id=$(if ($null -ne $fixture.id) { $fixture.id } else { 'test_game' })`nversionCode=$(if ($null -ne $fixture.versionCode) { $fixture.versionCode } else { '1' })`nversionName=$(if ($null -ne $fixture.versionName) { $fixture.versionName } else { '1.0' })`n$($fixture.config)"
     $directory = Join-Path $scratch $name
     New-Item -ItemType Directory $directory | Out-Null
     $configFile = Join-Path $directory 'game.properties'
@@ -104,9 +108,9 @@ foreach ($fixture in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'packagi
         New-Item -ItemType Directory $nested | Out-Null
         Copy-Item -LiteralPath $romFile -Destination (Join-Path $nested 'second.nes')
     }
-    if ($fixture.Contains('cheat')) {
-        $encoding = [Text.Encoding]::GetEncoding(($fixture.encoding ?? 'UTF-8'))
-        [IO.File]::WriteAllBytes((Join-Path $directory ($fixture.cheatName ?? '测试 游戏.CHT')), $encoding.GetBytes($fixture.cheat))
+    if ($fixture.PSObject.Properties['cheat']) {
+        $encoding = [Text.Encoding]::GetEncoding($(if ($fixture.encoding) { $fixture.encoding } else { 'UTF-8' }))
+        [IO.File]::WriteAllBytes((Join-Path $directory $(if ($fixture.cheatName) { $fixture.cheatName } else { '测试 游戏.CHT' })), $encoding.GetBytes($fixture.cheat))
     }
     if ($fixture.secondCheat) { [IO.File]::WriteAllText((Join-Path $directory 'second.cht'), '') }
     if ($fixture.oversizeCheat) { [IO.File]::WriteAllBytes((Join-Path $directory 'large.cht'), [byte[]]::new(131073)) }
@@ -115,9 +119,9 @@ foreach ($fixture in (Get-Content -LiteralPath (Join-Path $PSScriptRoot 'packagi
         continue
     }
     Check $name $directory $true 'APK'
-    $actual = & (Join-Path $root 'tools/resolve-game.ps1') -Game $directory | ConvertFrom-Json -AsHashtable
-    foreach ($key in $fixture.expect.Keys) {
-        if ($actual[$key] -cne $fixture.expect[$key]) { throw "FAIL $name snapshot property: $key" }
+    $actual = & (Join-Path $root 'tools/resolve-game.ps1') -Game $directory | ConvertFrom-Json
+    foreach ($key in $fixture.expect.PSObject.Properties.Name) {
+        if ($actual.$key -cne $fixture.expect.$key) { throw "FAIL $name snapshot property: $key" }
     }
     if ($fixture.filename -and [IO.Path]::GetFileName($actual.output) -cne $fixture.filename) { throw "FAIL $name filename" }
     if ($fixture.warning -and -not ($actual.warnings -cmatch ([regex]::Escape($fixture.warning)))) { throw "FAIL $name warning" }

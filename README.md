@@ -37,7 +37,7 @@ macOS / Linux 需要 Bash、`curl`、`tar`、`unzip`、`iconv` 和 `jq`，在仓
 
 首次运行会下载工具并安装到 `.toolchains/`，SDK 安装时按提示确认许可证。后续运行复用已有工具；添加 `-CheckOnly` 可检查环境。
 
-Windows 安装项目内的 PowerShell 7。Linux / macOS 的构建和打包直接在终端执行。
+Windows 使用系统自带的 Windows PowerShell 5.1。Linux / macOS 的构建和打包直接在终端执行。
 
 ### 2. 添加游戏
 

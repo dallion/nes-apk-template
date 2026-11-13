@@ -52,14 +52,9 @@ function Install-Archive($name, $spec, $destination, $innerDirectory) {
     }
     if ((Get-FileHash -LiteralPath $archive -Algorithm SHA256).Hash -ne $spec.sha256) { throw "Archive checksum mismatch: $archive" }
     $stage = Join-Path $paths.Directory ('staging/' + [guid]::NewGuid().ToString('N'))
-    if ($extension -eq 'tar.gz') {
-        New-Item -ItemType Directory -Force -Path $stage | Out-Null
-        & tar -xzf $archive -C $stage
-        if ($LASTEXITCODE -ne 0) { throw "Archive extraction failed: $archive" }
-    } else {
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        [IO.Compression.ZipFile]::ExtractToDirectory($archive, $stage)
-    }
+    New-Item -ItemType Directory -Force -Path $stage | Out-Null
+    & tar.exe -xf $archive -C $stage
+    if ($LASTEXITCODE -ne 0) { throw "Archive extraction failed: $archive" }
     $source = if ($innerDirectory) { Join-Path $stage $innerDirectory } else { $stage }
     if (-not (Test-Path -LiteralPath $source)) { throw "Unexpected archive layout: $archive" }
     New-Item -ItemType Directory -Force -Path (Split-Path $destination -Parent) | Out-Null
@@ -68,28 +63,12 @@ function Install-Archive($name, $spec, $destination, $innerDirectory) {
 }
 $jdkInner = "jdk-$($lock.jdk.version)"
 Install-Archive 'jdk' $lock.jdk $paths.Jdk $jdkInner
-Install-Archive 'pwsh' $lock.pwsh (Split-Path $paths.PowerShell -Parent) ''
-if ($PSVersionTable.PSVersion.Major -lt 7) {
-    # Android archives contain paths beyond Windows PowerShell/.NET Framework's path limit.
-    $arguments = @('-NoProfile', '-File', $PSCommandPath)
-    if ($CheckOnly) { $arguments += '-CheckOnly' }
-    if ($ArchiveDirectory) { $arguments += @('-ArchiveDirectory', $ArchiveDirectory) }
-    if ($SdkSource) { $arguments += @('-SdkSource', $SdkSource) }
-    if ($AcceptAndroidLicenses) { $arguments += '-AcceptAndroidLicenses' }
-    & $paths.PowerShell @arguments
-    if ($LASTEXITCODE -ne 0) { throw 'Project toolchain preparation failed.' }
-    return
-}
 Install-Archive 'android-command-line-tools' $lock.androidCommandLineTools (Join-Path $paths.Sdk "cmdline-tools/$($lock.androidCommandLineTools.version)") 'cmdline-tools'
 $jdkRelease = Get-Content -LiteralPath (Join-Path $paths.Jdk 'release') -Raw
 if ($jdkRelease -notmatch ('(?m)^JAVA_RUNTIME_VERSION="' + [regex]::Escape($lock.jdk.version) + '-LTS"')) { throw 'Project JDK version does not match the lock file.' }
 Invoke-ProjectToolchain {
     & $paths.Java -version
     if ($LASTEXITCODE -ne 0) { throw 'Project Java cannot start.' }
-    $version = & $paths.PowerShell -NoProfile -Command '$PSVersionTable.PSVersion.ToString()'
-    if ($LASTEXITCODE -ne 0) { throw 'Project PowerShell cannot start.' }
-    if ($version -ne $lock.pwsh.version) { throw 'Project PowerShell version does not match the lock file.' }
-    Write-Output "PowerShell $version"
 }
 
 $properties = Get-Content (Join-Path $paths.Root 'gradle.properties') -Raw | ConvertFrom-StringData

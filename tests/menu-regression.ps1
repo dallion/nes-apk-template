@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory=$true)][string]$Device,
     [Parameter(Mandatory=$true)][string]$Package,
     [ValidateRange(1,4)][int]$RuntimeSpeed = 1
@@ -17,7 +17,7 @@ function Invoke-Adb {
 function Get-Tree {
     Invoke-Adb shell uiautomator dump /data/local/tmp/nes-menu.xml | Out-Null
     Invoke-Adb pull /data/local/tmp/nes-menu.xml (Join-Path $result 'current.xml') | Out-Null
-    return [xml](Get-Content -LiteralPath (Join-Path $result 'current.xml') -Raw)
+    return [xml](Get-Content -LiteralPath (Join-Path $result 'current.xml') -Raw -Encoding UTF8)
 }
 function Find-Label([xml]$Tree, [string]$Label) {
     return @($Tree.SelectNodes('//node') | Where-Object { $_.text -eq $Label }) | Select-Object -First 1

@@ -53,8 +53,8 @@ def gameDirectory = rootProject.file(gameDir)
 def resolver
 def outputRoot = rootProject.file('outputs').absolutePath
 if (System.getProperty('os.name').toLowerCase(Locale.ROOT).startsWith('windows')) {
-    def projectPowerShell = rootProject.file('.toolchains/pwsh/pwsh.exe')
-    if (!projectPowerShell.isFile()) throw new GradleException('Project PowerShell is missing. Run tools/setup-toolchain.ps1.')
+    def projectPowerShell = new File(System.getenv('SystemRoot'), 'System32/WindowsPowerShell/v1.0/powershell.exe')
+    if (!projectPowerShell.isFile()) throw new GradleException('Windows PowerShell is missing.')
     resolver = [projectPowerShell.absolutePath, '-NoProfile', '-File', rootProject.file('tools/resolve-game.ps1').absolutePath]
 } else {
     resolver = ['/bin/bash', rootProject.file('tools/resolve-game.sh').absolutePath]
@@ -64,8 +64,8 @@ def resolved = providers.exec {
     commandLine resolver + ['-Game', gameDirectory.absolutePath, '-OutputRoot', outputRoot]
     ignoreExitValue = true
 }
-def gameJson = resolved.standardOutput.asText.get()
-if (resolved.result.get().exitValue != 0) throw new GradleException(resolved.standardError.asText.get())
+def gameJson = new String(resolved.standardOutput.asBytes.get(), 'UTF-8')
+if (resolved.result.get().exitValue != 0) throw new GradleException(new String(resolved.standardError.asBytes.get(), 'UTF-8'))
 def game = new groovy.json.JsonSlurper().parseText(gameJson)
 def snapshotPath = providers.gradleProperty('gameInputsSnapshot').getOrElse('')
 if (snapshotPath) {

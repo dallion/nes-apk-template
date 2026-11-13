@@ -73,14 +73,16 @@ jobs:
         if: runner.os == 'Windows'
         env:
           GH_TOKEN: ${{ github.token }}
-        shell: pwsh
+        shell: powershell
         run: |
-          $pwsh = './.toolchains/pwsh/pwsh.exe'
           $logs = 'tmp/' + (Get-Date -Format 'yyyy-MM-dd') + '-ci-checks'
           New-Item -ItemType Directory -Force -Path $logs | Out-Null
           for ($attempt = 1; $attempt -le 3; $attempt++) {
             $log = Join-Path $logs "attempt-$attempt.log"
-            & $pwsh -NoProfile -File tests/build-checks.ps1 2>&1 | Tee-Object -FilePath $log
+            & {
+              $ErrorActionPreference = 'Continue'
+              & powershell.exe -NoProfile -File tests/build-checks.ps1 2>&1
+            } | Tee-Object -FilePath $log
             if ($LASTEXITCODE -eq 0) { break }
             $output = Get-Content -LiteralPath $log -Raw
             $failures = [regex]::Matches($output, '(?s)\* What went wrong:(.*?)(?=\* Try:|\z)')

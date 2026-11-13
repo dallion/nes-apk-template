@@ -1,4 +1,4 @@
-# Shared by pack.ps1 and Gradle. Standard output is JSON only.
+﻿# Shared by pack.ps1 and Gradle. Standard output is JSON only.
 [CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$Game,
@@ -55,9 +55,14 @@ if([string]::IsNullOrWhiteSpace($appName) -or $appName -match '[\x00-\x1F]'){thr
 $applicationId=if($config.ContainsKey('applicationId')){$config['applicationId']}else{"com.nes.game.$id"}
 if($applicationId -cnotmatch '^[a-zA-Z][a-zA-Z0-9_]*(\.[a-zA-Z][a-zA-Z0-9_]*)+$'){throw 'applicationId 必须是有效的 Android 包名'}
 if($config.ContainsKey('cheatsRomSha256') -and $config['cheatsRomSha256'] -notmatch '^[0-9a-fA-F]{64}$'){throw 'cheatsRomSha256 必须是64位十六进制摘要'}
+function Get-BytesSha256([byte[]]$data) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { return [BitConverter]::ToString($sha.ComputeHash($data)).Replace('-','').ToLowerInvariant() }
+    finally { $sha.Dispose() }
+}
 $bytes=[IO.File]::ReadAllBytes($roms[0].FullName)
 if($bytes.Length -lt 16 -or $bytes[0] -ne 78 -or $bytes[1] -ne 69 -or $bytes[2] -ne 83 -or $bytes[3] -ne 26){throw 'NES 必须包含有效的 iNES / NES 2.0 文件头'}
-$romHash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+$romHash=(Get-BytesSha256 $bytes)
 $warnings=[Collections.Generic.List[string]]::new()
 $cheatFile=''; $cheatHash=''; $hasCodes=$false
 if($cheats.Count -eq 0){$warnings.Add('未提供金手指，将继续打包。')}
@@ -65,7 +70,7 @@ else {
     $cheatFile=$cheats[0].FullName
     if($cheats[0].Length -gt 128*1024){throw 'CHT 文件不能超过128 KiB'}
     $bytes=[IO.File]::ReadAllBytes($cheatFile)
-    $cheatHash=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($bytes)).ToLowerInvariant()
+    $cheatHash=(Get-BytesSha256 $bytes)
     if($roms[0].BaseName -cne $cheats[0].BaseName){$warnings.Add("NES 与 CHT 名称不一致，按同目录配对：$($roms[0].Name) / $($cheats[0].Name)")}
     if($config.ContainsKey('cheatsRomSha256')){
         if($config['cheatsRomSha256'] -ine $romHash){throw "金手指绑定的 ROM 摘要不匹配。实际：$romHash；需要重新验证，程序不会自动修改配置。"}

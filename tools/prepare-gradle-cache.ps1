@@ -41,7 +41,7 @@ $temporary = Join-Path $directory ([guid]::NewGuid().ToString('N') + '.partial')
 try {
     Invoke-WebRequest -Uri $asset[0].url -Headers $headers -OutFile $temporary
     if ((Get-FileHash -LiteralPath $temporary -Algorithm SHA256).Hash -ne $checksum) { throw 'Gradle archive checksum mismatch.' }
-    [IO.File]::Move($temporary, $archive, $false)
+    [IO.File]::Move($temporary, $archive)
 } finally {
     if (Test-Path -LiteralPath $temporary) { Remove-Item -LiteralPath $temporary }
 }

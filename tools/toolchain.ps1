@@ -1,4 +1,3 @@
-# Compatible with Windows PowerShell 5.1 so environment preparation needs no installed PowerShell 7.
 function Install-ProjectSdkCopy {
     param([string]$Source, [string]$Destination, [string]$ToolDirectory, [string]$RequiredFile)
     $toolRoot=[IO.Path]::GetFullPath($ToolDirectory)
@@ -37,7 +36,7 @@ function Get-ProjectToolchain {
         IsWindows = $onWindows
         Jdk = Join-Path $directory 'jdk'
         Sdk = Join-Path $directory 'android-sdk'
-        PowerShell = Join-Path $directory "pwsh/pwsh$executable"
+        PowerShell = Join-Path $env:SystemRoot 'System32/WindowsPowerShell/v1.0/powershell.exe'
         Java = Join-Path $directory "jdk/bin/java$executable"
         Adb = Join-Path $directory "android-sdk/platform-tools/adb$executable"
         Gradle = Join-Path $projectRoot $(if ($onWindows) { 'gradlew.bat' } else { 'gradlew' })
@@ -52,7 +51,7 @@ function Invoke-ProjectToolchain {
         JAVA_HOME = $paths.Jdk
         ANDROID_HOME = $paths.Sdk
         ANDROID_SDK_ROOT = $paths.Sdk
-        PATH = ((Join-Path $paths.Jdk 'bin'), (Split-Path $paths.PowerShell -Parent), (Split-Path $paths.Adb -Parent), $env:PATH) -join [IO.Path]::PathSeparator
+        PATH = ((Join-Path $paths.Jdk 'bin'), (Split-Path $paths.Adb -Parent), $env:PATH) -join [IO.Path]::PathSeparator
     }
     $previous = @{}
     foreach ($name in $values.Keys) { $previous[$name] = [Environment]::GetEnvironmentVariable($name, 'Process') }

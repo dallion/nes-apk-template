@@ -6,7 +6,7 @@ Windows 工具检查
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-toolchain.ps1 -CheckOnly
-./.toolchains/pwsh/pwsh.exe -NoProfile -File tests/toolchain-checks.ps1
+powershell.exe -NoProfile -File tests/toolchain-checks.ps1
 ./gradlew.bat --version
 ```
 
@@ -90,7 +90,7 @@ GLES 2 回归：核对 EGL 上下文请求版本为 2，检查游戏颜色、缩
 菜单设备回归使用独立测试应用，脚本会重新启动目标应用并写入其手动与自动存档：
 
 ```powershell
-./.toolchains/pwsh/pwsh.exe -NoProfile -File tests/menu-regression.ps1 -Device <device-id> -Package <test-application-id>
+powershell.exe -NoProfile -File tests/menu-regression.ps1 -Device <device-id> -Package <test-application-id>
 ```
 
 脚本检查主菜单、声音、速度、金手指添加页面、手柄绑定和重置确认，核对页面切换期间没有恢复模拟器或改变 Surface，并运行 30 秒以上验证自动保存及恢复。默认运行速度为 1×，使用 `-RuntimeSpeed 4` 检查 4× 运行。另在横竖屏、软键盘打开和实体手柄条件下检查滚动、输入保留、焦点边框、返回与确认；焦点不得进入覆盖层背后的游戏控件。重复打开和关闭菜单，检查进程、画面恢复及诊断记录。所有菜单按钮和列表项均应使用静态按下反馈。

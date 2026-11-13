@@ -8,15 +8,6 @@ param(
 $ErrorActionPreference='Stop'
 . (Join-Path $PSScriptRoot 'tools/toolchain.ps1')
 if (-not (Get-ProjectToolchain).IsWindows) { throw 'Use bash ./pack.sh on Linux or macOS.' }
-if ($PSVersionTable.PSVersion.Major -lt 7) {
-    $arguments=@('-NoProfile','-File',$PSCommandPath,'-Game',$Game)
-    if($CheckOnly){$arguments+='-CheckOnly'}
-    if($Test){$arguments+='-Test'}
-    if($Overwrite){$arguments+='-Overwrite'}
-    & (Get-ProjectToolchain).PowerShell @arguments
-    if($LASTEXITCODE -ne 0){throw "Packaging failed: $LASTEXITCODE"}
-    return
-}
 Invoke-ProjectToolchain {
 $selected=& (Join-Path $PSScriptRoot 'tools/resolve-game.ps1') -Game $Game | ConvertFrom-Json
 Write-Output "游戏：$($selected.appName) / id=$($selected.id)"
@@ -56,7 +47,7 @@ try {
             if(-not $item.Hash){if($entry){throw "发现不属于本次游戏的旧资源：$($item.Name)"}; continue}
             if(-not $entry){throw "构建缺少资源：$($item.Name)"}
             $stream=$entry.Open()
-            try {$actual=[Convert]::ToHexString([Security.Cryptography.SHA256]::HashData($stream)).ToLowerInvariant()}
+            try {$actual=(Get-FileHash -InputStream $stream -Algorithm SHA256).Hash.ToLowerInvariant()}
             finally {$stream.Dispose()}
             if($actual -ne $item.Hash){throw "构建过程中输入变化：$($item.Name)，未输出 APK，请重新打包。"}
         }
@@ -66,7 +57,11 @@ try {
     $temporary=Join-Path $outputDirectory ('.'+[guid]::NewGuid().ToString('N')+'.tmp')
     try {
         Copy-Item -LiteralPath $built -Destination $temporary
-        [IO.File]::Move($temporary,$selected.output,[bool]$Overwrite)
+        if ($Overwrite -and [IO.File]::Exists($selected.output)) {
+            [IO.File]::Replace($temporary,$selected.output,[NullString]::Value)
+        } else {
+            [IO.File]::Move($temporary,$selected.output)
+        }
     } finally {if(Test-Path -LiteralPath $temporary){Remove-Item -LiteralPath $temporary}}
     Write-Output "打包完成：$($selected.output)"
 } finally {

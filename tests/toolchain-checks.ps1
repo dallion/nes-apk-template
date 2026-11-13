@@ -7,7 +7,6 @@ foreach ($name in @('JAVA_HOME','ANDROID_HOME','ANDROID_SDK_ROOT','PATH')) { $be
 $paths = Get-ProjectToolchain
 if ($paths.Jdk -ne (Join-Path $root '.toolchains/jdk')) { throw 'JDK must belong to this project' }
 if ($paths.Sdk -ne (Join-Path $root '.toolchains/android-sdk')) { throw 'SDK must belong to this project' }
-if ($paths.PowerShell -ne (Join-Path $root '.toolchains/pwsh/pwsh.exe')) { throw 'PowerShell must belong to this project' }
 $observed = Invoke-ProjectToolchain { $env:JAVA_HOME }
 if ($observed -ne $paths.Jdk) { throw 'Child operation did not select project JDK' }
 if ([Environment]::GetEnvironmentVariable('JAVA_HOME', 'Process') -ne $environmentBefore) { throw 'Caller JAVA_HOME was not restored' }
@@ -29,7 +28,7 @@ if ($process.ExitCode -eq 0 -or $result -notmatch 'Missing jdk') { throw 'Missin
 if (Test-Path -LiteralPath (Join-Path $fixture '.toolchains')) { throw 'CheckOnly created an installation' }
 $lock=Get-Content (Join-Path $fixture 'tools/toolchain.lock.json') -Raw | ConvertFrom-Json
 $lock=$lock.platforms.($paths.Platform)
-foreach ($name in @('jdk','pwsh')) {
+foreach ($name in @('jdk')) {
     $directory=Join-Path $fixture ".toolchains/$name"
     New-Item -ItemType Directory -Force -Path $directory | Out-Null
     $lock.$name | ConvertTo-Json | Set-Content -LiteralPath (Join-Path $directory '.project-toolchain.json') -Encoding UTF8
