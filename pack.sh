@@ -8,15 +8,15 @@ test=false
 overwrite=false
 while (($#)); do
   case "$1" in
-    -Game) (($# >= 2)) || fail 'Specify -Game <directory>.'; game="$2"; shift ;;
-    -CheckOnly) check_only=true ;;
-    -Test) test=true ;;
-    -Overwrite) overwrite=true ;;
+    -game|-Game) (($# >= 2)) || fail 'Specify -game <directory>.'; game="$2"; shift ;;
+    -checkonly|-CheckOnly) check_only=true ;;
+    -test|-Test) test=true ;;
+    -overwrite|-Overwrite) overwrite=true ;;
     *) fail "Unknown option: $1" ;;
   esac
   shift
 done
-[[ -n "$game" ]] || fail 'Usage: bash ./pack.sh -Game <directory> [-CheckOnly] [-Test] [-Overwrite]'
+[[ -n "$game" ]] || fail 'Usage: bash ./pack.sh -game <directory> [-checkonly] [-test] [-overwrite]'
 selected="$(bash "$project_root/tools/resolve-game.sh" -Game "$game")"
 jq -r '
   "游戏：\(.appName) / id=\(.id)",
@@ -29,13 +29,16 @@ jq -r '
 jq -r '.warnings[] | "警告：\(.)"' <<< "$selected" >&2
 output="$(jq -r '.output' <<< "$selected")"
 if [[ -e "$output" || -L "$output" ]]; then
-  "$overwrite" || fail '输出 APK 已存在。请递增版本号，或明确传入 -Overwrite 替换。'
+  "$overwrite" || fail '输出 APK 已存在。请递增版本号，或明确传入 -overwrite 替换。'
   [[ -f "$output" && ! -L "$output" ]] || fail "交付路径必须是普通文件：$output"
 fi
 if "$check_only"; then exit 0; fi
 
 require_commands unzip
-[[ -x "$project_jdk/bin/java" ]] || fail 'Project JDK is missing. Run tools/setup-toolchain.sh.'
+setup="$project_root/tools/setup-toolchain.sh"
+if ! bash "$setup" -CheckOnly >/dev/null; then
+  bash "$setup"
+fi
 tasks=(:app:stageDebugApk)
 if "$test" || jq -e '.cheatFile != ""' <<< "$selected" >/dev/null; then
   tasks=(:app:testDebugUnitTest :app:stageDebugApk)

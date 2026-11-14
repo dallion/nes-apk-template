@@ -21,7 +21,7 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Toolchain checks failed.' }
     & $paths.PowerShell -NoProfile -File (Join-Path $PSScriptRoot 'pack-checks.ps1')
     if ($LASTEXITCODE -ne 0) { throw 'Packaging input checks failed.' }
-    & $paths.PowerShell -NoProfile -File (Join-Path $root 'pack.ps1') -Game $game -Test -Overwrite
+    & $paths.PowerShell -NoProfile -File (Join-Path $root 'pack.ps1') -game $game -test -overwrite
     if ($LASTEXITCODE -ne 0) { throw 'Test APK packaging failed.' }
     & $paths.Gradle "-PgameDir=$game" :app:lintDebug --console=plain
     if ($LASTEXITCODE -ne 0) { throw 'Lint failed.' }

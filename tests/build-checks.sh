@@ -26,5 +26,5 @@ if bash "$game/tools/setup-toolchain.sh" -CheckOnly > "$game/clean-check.log" 2>
   fail 'CheckOnly must reject a missing project JDK without installing tools.'
 fi
 bash tests/pack-checks.sh
-bash ./pack.sh -Game "$game" -Test -Overwrite
+bash ./pack.sh -game "$game" -test -overwrite
 with_project_toolchain ./gradlew "-PgameDir=$game" :app:lintDebug --console=plain

@@ -27,7 +27,7 @@ Gradle 发行包下载失败时，构建检查从同一官方发布资产预取�
 
 ```powershell
 ./tests/pack-checks.ps1
-./pack.ps1 -Game <game-directory> -CheckOnly
+./pack.ps1 -game <game-directory> -checkonly
 ./gradlew.bat -PgameDir=<game-directory> :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
@@ -35,7 +35,7 @@ Linux / macOS 运行：
 
 ```bash
 bash tests/pack-checks.sh
-bash ./pack.sh -Game <game-directory> -CheckOnly
+bash ./pack.sh -game <game-directory> -checkonly
 ./gradlew -PgameDir=<game-directory> :app:testDebugUnitTest :app:lintDebug :app:assembleDebug
 ```
 
@@ -117,10 +117,10 @@ powershell.exe -NoProfile -File tests/menu-regression.ps1 -Device <device-id> -P
 
 ```powershell
 node ./tests/native/make-cheat-rom.cjs <test-game-directory>/probe.nes
-./pack.ps1 -Game <test-game-directory> -Test
+./pack.ps1 -game <test-game-directory> -test
 ```
 
-Linux / macOS 使用 `bash ./pack.sh -Game <test-game-directory> -Test`。
+Linux / macOS 使用 `bash ./pack.sh -game <test-game-directory> -test`。
 
 该 Mapper 246 ROM 用 CPU RAM `0x6800` 控制背景调色板。以下操作检查解析、UI、持久化及核心注入的整条链路：
 

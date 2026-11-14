@@ -18,9 +18,15 @@ Write-Output "CHT：$(if($selected.cheatFile){$selected.cheatFile}else{'未提�
 Write-Output "图标：$(if($selected.iconFile){$selected.iconFile}else{'默认手柄图标'})"
 Write-Output "APK：$($selected.output)"
 foreach($warning in $selected.warnings){Write-Warning $warning}
-if((Test-Path -LiteralPath $selected.output) -and -not $Overwrite){throw '输出 APK 已存在。请递增版本号，或明确传入 -Overwrite 替换。'}
+if((Test-Path -LiteralPath $selected.output) -and -not $Overwrite){throw '输出 APK 已存在。请递增版本号，或明确传入 -overwrite 替换。'}
 if($CheckOnly){return}
-if(-not (Test-Path -LiteralPath (Get-ProjectToolchain).Java)){throw 'Project JDK is missing. Run tools/setup-toolchain.ps1.'}
+$setup = Join-Path $PSScriptRoot 'tools/setup-toolchain.ps1'
+try {
+    & $setup -CheckOnly | Out-Null
+} catch {
+    Write-Output "Preparing project tools: $($_.Exception.Message)"
+    & $setup
+}
 $tasks=@(':app:stageDebugApk')
 if($Test -or $selected.cheatFile){$tasks=@(':app:testDebugUnitTest',':app:stageDebugApk')}
 $snapshotDirectory=Join-Path $PSScriptRoot 'build/package-inputs'

@@ -21,25 +21,7 @@
 
 构建环境支持 Windows x64、Linux x64，以及 Intel / Apple Silicon Mac。ROM 由使用者自行准备。
 
-### 1. 准备环境
-
-Windows 在仓库根目录运行：
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File tools/setup-toolchain.ps1
-```
-
-macOS / Linux 需要 Bash、`curl`、`tar`、`unzip`、`iconv` 和 `jq`，在仓库根目录运行：
-
-```bash
-./tools/setup-toolchain.sh
-```
-
-首次运行会下载工具并安装到 `.toolchains/`，SDK 安装时按提示确认许可证。后续运行复用已有工具；添加 `-CheckOnly` 可检查环境。
-
-Windows 使用系统自带的 Windows PowerShell 5.1。Linux / macOS 的构建和打包直接在终端执行。
-
-### 2. 添加游戏
+### 1. 添加游戏
 
 在 `work/` 中创建长期保留的个人游戏目录；该目录已被 Git 忽略，需自行备份：
 
@@ -64,21 +46,23 @@ versionName=1.0
 
 如需自定义桌面图标，放入名为 `icon.png` 的正方形 PNG，推荐 512 × 512 像素，支持透明背景。省略该文件时使用默认手柄图标。
 
-### 3. 构建 APK
+### 2. 构建 APK
 
 Windows
 
 ```powershell
-./pack.ps1 -Game work/my-game
+./pack.ps1 -game work/my-game
 ```
 
 Linux / macOS
 
 ```bash
-bash ./pack.sh -Game work/my-game
+bash ./pack.sh -game work/my-game
 ```
 
-两条命令生成同样命名的 APK。
+按系统运行对应的一条命令。首次打包会准备项目内的 JDK 和 Android SDK，并在需要时提示确认 SDK 许可证。后续打包复用已安装的工具。Windows 使用系统自带的 PowerShell 5.1 和 tar.exe。Linux / macOS 需要 Bash、curl、tar、unzip、iconv 和 jq。
+
+APK 输出到：
 
 ```text
 outputs/my_game/game-v1.0-c1-debug.apk
@@ -119,13 +103,13 @@ versionName=1.0
 
 ```powershell
 # 检查游戏目录和配置
-./pack.ps1 -Game work/my-game -CheckOnly
+./pack.ps1 -game work/my-game -checkonly
 
 # 构建并运行单元测试
-./pack.ps1 -Game work/my-game -Test
+./pack.ps1 -game work/my-game -test
 
 # 覆盖已有的同名 APK
-./pack.ps1 -Game work/my-game -Overwrite
+./pack.ps1 -game work/my-game -overwrite
 ```
 
 同名 APK 已存在时，需要显式指定 `-Overwrite`。打包失败会保留原文件。
