@@ -32,6 +32,7 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
     private lateinit var input: InputRouter
     private lateinit var controller: ControllerInput
     private lateinit var controls: TouchControls
+    private lateinit var playArea: FrameLayout
     private lateinit var speedHotkeys: SpeedHotkeys
     private lateinit var fpsText: TextView
     private lateinit var speedText: TextView
@@ -139,7 +140,7 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
         }
         controller = ControllerInput(input,getSharedPreferences("controller",MODE_PRIVATE))
         controls = TouchControls(this,input)
-        val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(0xff11151c.toInt()) }
+        val layout = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(0xff30342d.toInt()) }
         fpsText = statusLabel().apply {
             setText(R.string.fps_pending)
             minWidth = dp(82)
@@ -156,9 +157,16 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
             addView(Space(this@MainActivity),LinearLayout.LayoutParams(0,1,1f))
             addView(GameMenu.button(this@MainActivity,"菜单",action=::openMenu),LinearLayout.LayoutParams(-2,-1))
         }
-        layout.addView(bar,LinearLayout.LayoutParams(-1,dp(44)))
-        layout.addView(game,LinearLayout.LayoutParams(-1,0,1f))
-        layout.addView(controls,LinearLayout.LayoutParams(-1,dp(154)))
+        layout.addView(bar,LinearLayout.LayoutParams(-1,dp(48)))
+        playArea = FrameLayout(this).apply {
+            setBackgroundColor(0xff20231e.toInt())
+            addView(game, FrameLayout.LayoutParams(-1, -1))
+            addView(controls, FrameLayout.LayoutParams(-1, -1))
+        }
+        layout.addView(playArea, LinearLayout.LayoutParams(-1, 0, 1f))
+        playArea.addOnLayoutChangeListener { _, l, t, r, b, oldL, oldT, oldR, oldB ->
+            if (r - l != oldR - oldL || b - t != oldB - oldT) updatePlayLayout()
+        }
         val root = FrameLayout(this).apply { addView(layout,FrameLayout.LayoutParams(-1,-1)) }
         menu = GameMenu(this,root) {
             autoSavePageGeneration++
@@ -169,7 +177,9 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
             resumeSession()
         }
         androidx.core.view.ViewCompat.setOnApplyWindowInsetsListener(root) { _,insets ->
-            menu.setKeyboardInset(insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
+            val safe = insets.getInsets(WindowInsetsCompat.Type.displayCutout())
+            layout.setPadding(safe.left, safe.top, safe.right, safe.bottom)
+            menu.setInsets(safe, insets.getInsets(WindowInsetsCompat.Type.ime()).bottom)
             insets
         }
         setContentView(root)
@@ -236,8 +246,27 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
             input.releaseAll()
             controls.clearVisuals()
             controls.visibility = visibility
+            updatePlayLayout()
         }
     }
+    private fun updatePlayLayout() {
+        if (playArea.width == 0 || playArea.height == 0) return
+        val landscape = resources.configuration.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val touch = controls.visibility == View.VISIBLE
+        val side = if (touch && landscape) minOf(dp(152), playArea.width / 5) else 0
+        val bottom = if (touch && !landscape) minOf(dp(184), playArea.height / 2) else 0
+        controls.setSideWidth(side)
+        controls.layoutParams = FrameLayout.LayoutParams(
+            -1, if (landscape) -1 else bottom, Gravity.BOTTOM
+        )
+        game.layoutParams = FrameLayout.LayoutParams(-1, -1).apply {
+            leftMargin = side
+            rightMargin = side
+            bottomMargin = bottom
+        }
+    }
+
     private fun pauseSession() {
         autoSaveTimer.pause()
         fpsCounter.reset()
@@ -305,7 +334,7 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
         if(!menu.isShowing) {
             diagnostics.record("menu open")
             pauseSession(); saveSram()
-            (game.parent as View).importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
+            (playArea.parent as View).importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS
         }
         menu.show(title,subtitle,onBack,build)
     }
@@ -467,6 +496,7 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
     }
     override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
         super.onConfigurationChanged(newConfig)
+        updatePlayLayout()
         window.decorView.post { menu.resize() }
     }
     // Intercept before focused views (including GLRetroView) can bypass remapping.
@@ -497,4 +527,3 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
         input.releaseAll(); controls.clearVisuals(); updateTouchControlsVisibility()
     }
 }
-

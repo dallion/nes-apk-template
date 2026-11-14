@@ -16,17 +16,39 @@ class TouchControls(context: Context, private val input: InputRouter) : View(con
     private val buttons = linkedMapOf<Int,Pair<String,RectF>>()
     private val active = mutableMapOf<Int,Set<Int>>()
     private fun d(value: Float) = value * resources.displayMetrics.density
-    override fun onSizeChanged(w: Int,h: Int,oldw: Int,oldh: Int) {
+    private var sideWidth = 0
+
+    fun setSideWidth(value: Int) {
+        if (sideWidth == value) return
+        sideWidth = value
+        rebuildButtons(width, height)
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        rebuildButtons(w, h)
+    }
+
+    private fun rebuildButtons(w: Int, h: Int) {
+        active.keys.forEach { input.releaseSource("touch:$it") }
+        active.clear()
         buttons.clear()
-        touchLayout(w.toFloat(),h.toFloat(),resources.displayMetrics.density).forEach {
+        touchLayout(w.toFloat(),h.toFloat(),resources.displayMetrics.density,sideWidth.toFloat()).forEach {
             buttons[it.key] = it.label to RectF(it.left,it.top,it.right,it.bottom)
         }
     }
     override fun onDraw(canvas: Canvas) {
         buttons.forEach { (key,pair) ->
             val (label,r) = pair
-            paint.color = if(active.values.any { key in it }) Color.rgb(91,125,170) else Color.rgb(43,51,65)
-            canvas.drawRoundRect(r,d(12f),d(12f),paint)
+            val pressed = active.values.any { key in it }
+            val face = label == "A" || label == "B"
+            paint.color = when {
+                pressed -> Color.rgb(128, 139, 109)
+                label == "A" -> Color.rgb(169, 54, 50)
+                label == "B" -> Color.rgb(102, 115, 84)
+                else -> Color.rgb(72, 78, 67)
+            }
+            val radius = if (face || label.length > 1) r.height()/2 else d(7f)
+            canvas.drawRoundRect(r, radius, radius, paint)
             paint.color = Color.WHITE; paint.textAlign = Paint.Align.CENTER
             paint.textSize = d(if(label.length > 1) 12f else 20f)
             canvas.drawText(label,r.centerX(),r.centerY()-(paint.ascent()+paint.descent())/2,paint)
@@ -34,6 +56,8 @@ class TouchControls(context: Context, private val input: InputRouter) : View(con
     }
     override fun performClick(): Boolean { super.performClick(); return true }
     override fun onTouchEvent(event: MotionEvent): Boolean {
+        if (sideWidth > 0 && event.actionMasked == MotionEvent.ACTION_DOWN &&
+            event.x >= sideWidth && event.x < width - sideWidth) return false
         if(event.actionMasked == MotionEvent.ACTION_CANCEL) {
             active.keys.toList().forEach { input.releaseSource("touch:$it") }; active.clear(); invalidate(); return true
         }

@@ -19,12 +19,12 @@ import android.widget.ScrollView
 import android.widget.TextView
 
 /** One in-window overlay. Page changes never detach or resize the game Surface. */
-class GameMenu(private val context: Context, root: FrameLayout, private val onClose: () -> Unit) {
+class GameMenu(private val context: Context, private val root: FrameLayout, private val onClose: () -> Unit) {
     companion object {
-        val PAPER = Color.rgb(231,228,219)
+        val PAPER = Color.rgb(243,240,231)
         val INK = Color.rgb(44,47,49)
         val MUTED = Color.rgb(98,100,97)
-        val RED = Color.rgb(157,42,48)
+        val RED = Color.rgb(169,54,50)
         val FIELD = Color.rgb(247,245,239)
 
         fun button(context: Context, label: String, primary: Boolean = false, action: () -> Unit): TextView {
@@ -91,10 +91,14 @@ class GameMenu(private val context: Context, root: FrameLayout, private val onCl
         capture = null
         joystickDirection = 0
         rebuild = { show(title,subtitle,onBack,build) }
-        val maxWidth = minOf(context.resources.displayMetrics.widthPixels-dp(32),dp(760))
+        val landscape = context.resources.configuration.orientation ==
+            android.content.res.Configuration.ORIENTATION_LANDSCAPE
+        val maxWidth = minOf(root.width.takeIf { it > 0 } ?: context.resources.displayMetrics.widthPixels,
+            dp(if (landscape) 620 else 480)) - overlay.paddingLeft - overlay.paddingRight - dp(32)
         val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(24),dp(20),dp(24),dp(20))
+            val padding = dp(if (landscape) 16 else 20)
+            setPadding(padding,padding,padding,padding)
             background = GradientDrawable().apply { setColor(PAPER); cornerRadius = dp(14).toFloat() }
             isClickable = true
         }
@@ -104,7 +108,7 @@ class GameMenu(private val context: Context, root: FrameLayout, private val onCl
             overScrollMode = View.OVER_SCROLL_NEVER
             addView(card,ViewGroup.LayoutParams(-1,-2))
         }
-        overlay.addView(scroll,FrameLayout.LayoutParams(maxWidth,-2,Gravity.CENTER).apply {
+        overlay.addView(scroll,FrameLayout.LayoutParams(maxWidth.coerceAtLeast(1),-2,Gravity.CENTER).apply {
             setMargins(dp(16),dp(16),dp(16),dp(16))
         })
         val page = Page(card)
@@ -125,7 +129,9 @@ class GameMenu(private val context: Context, root: FrameLayout, private val onCl
         capture = handler
     }
     fun onKey(handler: (KeyEvent) -> Boolean) { capture = handler }
-    fun setKeyboardInset(bottom: Int) { overlay.setPadding(0,0,0,bottom) }
+    fun setInsets(safe: androidx.core.graphics.Insets, keyboardBottom: Int) {
+        overlay.setPadding(safe.left,safe.top,safe.right,maxOf(safe.bottom,keyboardBottom))
+    }
     fun back() { back?.invoke() }
     fun dismiss() {
         if(!isShowing) return
@@ -216,7 +222,7 @@ class GameMenu(private val context: Context, root: FrameLayout, private val onCl
             return button
         }
         fun pair(first: Pair<String,() -> Unit>, second: Pair<String,() -> Unit>) {
-            if(context.resources.configuration.screenWidthDp < 600) {
+            if(context.resources.configuration.screenWidthDp < 520) {
                 action(first.first,action=first.second); action(second.first,action=second.second)
             } else {
                 val row = LinearLayout(context)
