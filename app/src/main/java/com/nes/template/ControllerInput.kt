@@ -10,6 +10,8 @@ class ControllerInput(private val input: InputRouter, private val preferences: S
     val mapping = linkedMapOf(
         KeyEvent.KEYCODE_BUTTON_A to KeyEvent.KEYCODE_BUTTON_A,
         KeyEvent.KEYCODE_BUTTON_B to KeyEvent.KEYCODE_BUTTON_B,
+        KeyEvent.KEYCODE_BUTTON_X to KeyEvent.KEYCODE_BUTTON_X,
+        KeyEvent.KEYCODE_BUTTON_Y to KeyEvent.KEYCODE_BUTTON_Y,
         KeyEvent.KEYCODE_BUTTON_START to KeyEvent.KEYCODE_BUTTON_START,
         KeyEvent.KEYCODE_BUTTON_SELECT to KeyEvent.KEYCODE_BUTTON_SELECT,
         KeyEvent.KEYCODE_DPAD_UP to KeyEvent.KEYCODE_DPAD_UP,

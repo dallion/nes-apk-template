@@ -17,6 +17,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.swordfish.libretrodroid.GLRetroView
 import com.swordfish.libretrodroid.GLRetroViewData
+import com.swordfish.libretrodroid.Variable
 import com.swordfish.libretrodroid.LibretroDroid
 import java.io.File
 import java.text.SimpleDateFormat
@@ -119,6 +120,7 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
             gameFilePath = File(storage.directory,"game.nes").apply { writeBytes(rom) }.absolutePath
             savesDirectory = storage.directory.absolutePath
             saveRAMState = storage.readSram()
+            variables = arrayOf(Variable("fceumm_turbo_enable", "Player 1"))
         }
         game = diagnosticOperation("game view init") { GLRetroView(this,data) }
         game.holder.addCallback(object : SurfaceHolder.Callback {
@@ -462,9 +464,10 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
         }
     }
     private fun mapMenu() {
-        val keys = intArrayOf(KeyEvent.KEYCODE_BUTTON_A,KeyEvent.KEYCODE_BUTTON_B,KeyEvent.KEYCODE_BUTTON_START,KeyEvent.KEYCODE_BUTTON_SELECT,
+        val keys = intArrayOf(KeyEvent.KEYCODE_BUTTON_A,KeyEvent.KEYCODE_BUTTON_B,KeyEvent.KEYCODE_BUTTON_X,KeyEvent.KEYCODE_BUTTON_Y,
+            KeyEvent.KEYCODE_BUTTON_START,KeyEvent.KEYCODE_BUTTON_SELECT,
             KeyEvent.KEYCODE_DPAD_UP,KeyEvent.KEYCODE_DPAD_DOWN,KeyEvent.KEYCODE_DPAD_LEFT,KeyEvent.KEYCODE_DPAD_RIGHT)
-        val labels = listOf("A","B","START","SELECT","上","下","左","右")
+        val labels = listOf("A","B","X（连发 A）","Y（连发 B）","START","SELECT","上","下","左","右")
         showPanel("手柄设置","选择 FC 按钮，再按下要绑定的手柄按键。") {
             keys.forEachIndexed { index,key -> action(labels[index]) { captureKey(key,labels[index]) } }
             action("恢复默认") {
