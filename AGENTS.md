@@ -27,6 +27,7 @@ Maintain a simple, reusable single-game FC/NES Android template. Replace the gam
 
 - Do not commit commercial ROMs, signing keys, local configuration, or build outputs.
 - Preserve third-party licenses and source provenance.
+- Include a game-specific cover as `icon.png` for every game maintained under `work/`. Use it as the Android launcher icon.
 - Place reusable project scripts in `tools/`, verification scripts in `tests/`, and one-off task scripts in `tmp/`. Keep root-level scripts limited to project entry points and toolchain-required files.  
 - Preserve `work/` as personal data across cleanup tasks. Keep game-specific retained evidence and backups under the corresponding game directory. Store disposable test inputs and execution output in `tmp/`; retain existing project history under `work/_archive/`. Do not add new test runs there.
 - Use the root `pack.ps1` on Windows and `bash ./pack.sh` on Linux/macOS for every game. Keep game identity, version, and ROM binding in `game.properties`; do not copy packaging logic or require per-game scripts. Follow `work/AGENTS.md` when organizing the collection.
