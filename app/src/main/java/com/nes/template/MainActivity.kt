@@ -44,6 +44,7 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
     private var autoSaveFailureShown = false
     private var cheatBook: CheatBook? = null
     private var bundledCheats: List<CheatEntry> = emptyList()
+    private var bundledCheatForms: List<CheatForm> = emptyList()
     private val exportDiagnostics = registerForActivityResult(ActivityResultContracts.CreateDocument("application/zip")) { uri ->
         if (uri != null) lifecycleScope.launch {
             runCatching {
@@ -109,10 +110,14 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
         storage = GameStorage(File(filesDir,"games"),rom,BuildConfig.CORE_ID)
         diagnostics.record("rom sha256=${storage.directory.name}")
         runCatching {
-            bundledCheats = if(assets.list("")?.contains("game.cht") == true)
-                assets.open("game.cht").use { CheatParser.parseBundled(CheatParser.decode(it.readBytes())) }
-            else emptyList()
-            cheatBook = CheatBook(storage,bundledCheats)
+            if(assets.list("")?.contains("game.cht") == true) {
+                val (entries, forms) = assets.open("game.cht").use {
+                    CheatParser.bundledConfiguration(CheatParser.decode(it.readBytes()))
+                }
+                bundledCheats = entries
+                bundledCheatForms = forms
+            }
+            cheatBook = CheatBook(storage,bundledCheats,bundledCheatForms)
         }
             .onFailure { notify("读取金手指记录失败，游戏仍可运行") }
         val data = GLRetroViewData(this).apply {
@@ -443,7 +448,7 @@ class MainActivity : ComponentActivity(), InputManager.InputDeviceListener {
         if(book == null) {
             showPanel("金手指记录无法读取","可以重新创建空记录。游戏存档不会改变。") {
                 action("重新创建",primary=true) {
-                    runCatching { cheatBook = CheatBook.clear(storage,bundledCheats) }
+                    runCatching { cheatBook = CheatBook.clear(storage,bundledCheats,bundledCheatForms) }
                         .onSuccess { openCheats() }.onFailure { notify("创建失败：${it.message}") }
                 }
                 action("返回") { openMenu() }

@@ -35,9 +35,16 @@ class CheatDialogs(
 
     private fun detail(index: Int) {
         val entry = book.entries.getOrNull(index) ?: return
+        val form = book.formFor(entry)
         menu.show(entry.name,onBack=::show) {
-            text(entry.code)
-            text("停用会停止注入，不会回滚已经改变的游戏数值。")
+            if(form == null) {
+                text(entry.code)
+                text("停用会停止注入，不会回滚已经改变的游戏数值。")
+            } else {
+                text(form.fields.zip(requireNotNull(form.values(entry))).joinToString(" · ") { (field,value) ->
+                    "${field.label} ${field.display(value)}"
+                })
+            }
             action(if(entry.enabled) "停用" else "启用",primary=true) {
                 if(update(book.entries.toMutableList().apply { this[index] = entry.copy(enabled=!entry.enabled) })) show()
             }
@@ -56,6 +63,10 @@ class CheatDialogs(
 
     private fun edit(index: Int) {
         val entry = book.entries.getOrNull(index) ?: return
+        book.formFor(entry)?.let { form ->
+            editForm(index,entry,form,requireNotNull(form.values(entry)).map(Int::toString))
+            return
+        }
         menu.show("编辑金手指","地址和值均为十六进制，多段代码共同保存。",onBack={ detail(index) }) {
             val name = field("名称").apply { setText(entry.name) }
             val code = field("代码",multiline=true).apply { setText(entry.code.replace(' ','\n')) }
@@ -63,6 +74,60 @@ class CheatDialogs(
                 val next = entry.copy(name=name.text.toString().trim(),
                     code=code.text.toString().trim().uppercase(java.util.Locale.ROOT)
                         .split(Regex("\\s+")).joinToString(" "))
+                if(update(book.entries.toMutableList().apply { this[index] = next })) detail(index)
+            }
+            action("取消") { detail(index) }
+        }
+    }
+
+    private fun editForm(index: Int, entry: CheatEntry, form: CheatForm, draft: List<String>) {
+        menu.show("编辑金手指",entry.name,onBack={ detail(index) }) {
+            val readValues = mutableListOf<() -> String>()
+            form.fields.forEachIndexed { fieldIndex, field ->
+                section(field.label)
+                if(field.choices.isNotEmpty()) {
+                    val selected = draft[fieldIndex].toInt()
+                    action("${field.display(selected)} ▾") {
+                        val current = readValues.map { it() }
+                        menu.show(field.label,onBack={ editForm(index,entry,form,current) }) {
+                            field.choices.forEach { (value,choice) ->
+                                action(choice.label,primary=value==selected) {
+                                    val next = current.toMutableList().apply { this[fieldIndex] = value.toString() }
+                                    form.fields.forEachIndexed { dependentIndex, dependent ->
+                                        if(dependent.rangeSource == field.index) {
+                                            val range = form.numberRange(dependentIndex,next.map(String::toIntOrNull))
+                                            val amount = next[dependentIndex].toIntOrNull()
+                                            next[dependentIndex] = (amount?.coerceIn(range) ?: range.first).toString()
+                                        }
+                                    }
+                                    editForm(index,entry,form,next)
+                                }
+                            }
+                            action("返回") { editForm(index,entry,form,current) }
+                        }
+                    }
+                    readValues.add { selected.toString() }
+                } else {
+                    val range = form.numberRange(fieldIndex,draft.map(String::toIntOrNull))
+                    val input = field("${range.first}～${range.last}").apply {
+                        inputType = android.text.InputType.TYPE_CLASS_NUMBER
+                        setText(draft[fieldIndex])
+                    }
+                    readValues.add { input.text.toString() }
+                }
+            }
+            action("保存修改",primary=true) {
+                val draftValues = readValues.map { it().toIntOrNull() }
+                val values = form.fields.mapIndexed { fieldIndex, field ->
+                    val value = draftValues[fieldIndex]
+                    val range = form.numberRange(fieldIndex,draftValues)
+                    if(field.choices.isEmpty() && (value == null || value !in range)) {
+                        notify("${field.label}需为 ${range.first}～${range.last}")
+                        return@action
+                    }
+                    requireNotNull(value)
+                }
+                val next = entry.copy(code=form.code(values))
                 if(update(book.entries.toMutableList().apply { this[index] = next })) detail(index)
             }
             action("取消") { detail(index) }

@@ -2,13 +2,20 @@ package com.nes.template
 
 import java.io.*
 
-class CheatBook(private val storage: GameStorage, presets: List<CheatEntry> = emptyList()) {
+class CheatBook internal constructor(
+    private val storage: GameStorage,
+    presets: List<CheatEntry> = emptyList(),
+    private val forms: List<CheatForm> = emptyList(),
+) {
     val presets = presets.map { it.copy(enabled=false) }.also(CheatParser::validate)
     var entries: List<CheatEntry> = storage.readCheats()?.let(::decode) ?: this.presets
         private set
 
     fun restorePresets() {
-        val missing = presets.filter { preset -> entries.none { it.code == preset.code && it.name == preset.name } }
+        val missing = presets.filter { preset ->
+            val form = forms.firstOrNull { it.preset == preset }
+            entries.none { it.code == preset.code && it.name == preset.name || form?.values(it) != null }
+        }
         replace(entries+missing)
     }
 
@@ -20,10 +27,13 @@ class CheatBook(private val storage: GameStorage, presets: List<CheatEntry> = em
 
     fun activeCodes(): List<String> = entries.filter { it.enabled }.flatMap { CheatParser.nativeCodes(it.code) }
 
+    internal fun formFor(entry: CheatEntry): CheatForm? = forms.firstOrNull { it.values(entry) != null }
+
     companion object {
-        fun clear(storage: GameStorage, presets: List<CheatEntry> = emptyList()): CheatBook {
+        internal fun clear(storage: GameStorage, presets: List<CheatEntry> = emptyList(),
+                           forms: List<CheatForm> = emptyList()): CheatBook {
             storage.writeCheats(encode(emptyList()))
-            return CheatBook(storage,presets)
+            return CheatBook(storage,presets,forms)
         }
         private fun encode(entries: List<CheatEntry>): ByteArray {
             val buffer = ByteArrayOutputStream()

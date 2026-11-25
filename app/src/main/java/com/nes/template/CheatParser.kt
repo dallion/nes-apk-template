@@ -14,6 +14,12 @@ object CheatParser {
     private val raw = Regex("^($hex{4}):($hex{2})$")
     private val genie = Regex("^[APZLGITYEOXUKSVN]{6}([APZLGITYEOXUKSVN]{2})?$")
 
+    internal fun genieGroup(text: String): String {
+        val tokens = text.split(';').map { it.trim().uppercase(Locale.ROOT) }
+        require(tokens.size <= MAX_CODES && tokens.all(genie::matches)) { "无效的 Game Genie 代码组" }
+        return tokens.joinToString(" ")
+    }
+
     fun nativeCodes(code: String): List<String> {
         require(code.length <= MAX_FILE_BYTES) { "代码文本过长" }
         val tokens = code.trim().split(Regex("\\s+"))
@@ -101,13 +107,16 @@ object CheatParser {
         return result
     }
 
-    fun parseBundled(text: String): List<CheatEntry> {
+    fun parseBundled(text: String): List<CheatEntry> = bundledConfiguration(text).first
+
+    internal fun bundledConfiguration(text: String): Pair<List<CheatEntry>, List<CheatForm>> {
         require(text.length <= MAX_FILE_BYTES) { "代码文本过长" }
         val hasCode = text.removePrefix("\uFEFF").lineSequence().any {
             val line = it.trim()
             line.isNotEmpty() && !line.startsWith(';') && !line.startsWith("//")
         }
-        return if(hasCode) parse(text) else emptyList()
+        val entries = if(hasCode) parse(text) else emptyList()
+        return entries to CheatForm.parse(text, entries)
     }
 
     fun validate(entries: List<CheatEntry>) {
